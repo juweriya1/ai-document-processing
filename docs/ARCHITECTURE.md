@@ -2,12 +2,14 @@
 
 ## System Overview
 
-The Intelligent Document Processing (IDP) Platform is a monolithic but modular backend built with Python 3.11 and FastAPI. It processes uploaded documents (PDFs, images) through an ingestion-to-analytics pipeline. The frontend (React.js, not yet implemented) will connect via REST API with JWT authentication.
+The Intelligent Document Processing (IDP) Platform is a monolithic but modular backend built with Python 3.11 and FastAPI, with a React.js single-page application frontend. It processes uploaded documents (PDFs, images) through an ingestion-to-analytics pipeline. The frontend connects via REST API with JWT authentication.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        React Frontend                       │
-│                      (Not implemented)                      │
+│                    React Frontend (Phase 5)                  │
+│  Login │ Dashboard │ Upload │ Processing │ Validation │ ... │
+│         AuthContext + ProtectedRoute + Toast                 │
+│                  fetch API client (JWT)                      │
 └──────────────────────────┬──────────────────────────────────┘
                            │ REST / JSON
                            ▼
@@ -182,8 +184,6 @@ The following packages exist as empty `__init__.py` markers or as schema-only mo
 | `src/backend/validation/` | Phase 3 | Schema validation + HITL correction workflow |
 | `src/backend/pipeline/` | Phase 3 | End-to-end orchestration (upload → extract → validate → store) |
 | `src/backend/analytics/` | Phase 4 | Plotly dashboards, scikit-learn predictions, anomaly detection |
-| Frontend (React.js) | Phase 5 | 8 pages: Login, Dashboard, Upload, Processing, Validation, Review, Insights, Admin |
-
 The ORM models `LineItem`, `Correction`, `AnalyticsSummary`, and `SupplierMetric` have table definitions but no CRUD functions or API endpoints yet. They exist to avoid schema migrations when those features are built.
 
 ## Database Architecture
@@ -225,3 +225,67 @@ FastAPI (CORS middleware)
 ```
 
 The `Preprocessing` class is implemented and tested but not yet wired into any API endpoint. It will be invoked by the pipeline orchestrator in Phase 3, after OCR and extraction modules are built in Phase 2.
+
+## Frontend Architecture (Phase 5)
+
+The frontend is a React.js single-page application under `frontend/`. It uses React Router v6 for client-side routing, React Context with `useReducer` for auth state management, and plain CSS with CSS custom properties for styling.
+
+```
+frontend/src/
+├── index.js                    ← React DOM entry point
+├── App.js                      ← BrowserRouter + 8 routes + providers
+├── api/
+│   └── client.js               ← fetch wrapper, JWT Bearer, 4 API functions
+├── context/
+│   └── AuthContext.js           ← useReducer + localStorage persistence
+├── components/
+│   ├── Navbar.js + Navbar.css   ← Top nav with active links, role-based admin
+│   ├── ProtectedRoute.js       ← Auth guard with allowedRoles
+│   └── Toast.js + Toast.css    ← Notification system (3 types, auto-dismiss)
+└── pages/
+    ├── LoginPage.js             ← FUNCTIONAL: register/login with API
+    ├── DashboardPage.js         ← PARTIAL: live health, static metrics
+    ├── UploadPage.js            ← FUNCTIONAL: drag-drop + upload API
+    ├── ProcessingPage.js        ← PLACEHOLDER: pipeline steps UI
+    ├── ValidationPage.js        ← PLACEHOLDER: field validation table
+    ├── ReviewPage.js            ← PLACEHOLDER: HITL review split view
+    ├── InsightsPage.js          ← PLACEHOLDER: risk cards + AI insights
+    └── AdminPage.js             ← PLACEHOLDER: user table (admin-only)
+```
+
+### Frontend Technology Stack
+
+| Layer | Technology | Version |
+|-------|-----------|---------|
+| Runtime | Node.js | 25.1.0 |
+| UI Library | React | 19.0.0 |
+| Routing | react-router-dom | 7.2.0 |
+| Build | react-scripts (CRA) | 5.0.1 |
+| HTTP | fetch API (native) | — |
+| Styling | Plain CSS + CSS variables | — |
+| State | React Context + useReducer | — |
+| Storage | localStorage | — |
+
+### Frontend Request Flow
+
+```
+User Action
+  │
+  ▼
+React Component (e.g., UploadPage)
+  │
+  ▼
+api/client.js → request(endpoint, options)
+  │
+  ├── Reads JWT from localStorage
+  ├── Attaches Authorization: Bearer <token>
+  ├── Sets Content-Type (JSON or FormData)
+  │
+  ▼
+fetch(API_URL + endpoint)
+  │
+  ├── 200/201 → return parsed JSON → component updates state
+  ├── 400 → throw Error(detail) → component shows error
+  ├── 401 → clear localStorage → redirect to /login
+  └── 403 → throw Error(detail) → component shows error
+```

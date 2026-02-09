@@ -8,7 +8,7 @@
 | 2 | Core AI | Planned | OCR, layout analysis, table extraction, NER, field mapping |
 | 3 | Validation & HITL | Planned | Schema validation, correction workflow, pipeline orchestrator |
 | 4 | Analytics | Planned | Dashboard metrics, predictions, anomaly detection |
-| 5 | Frontend | Planned | React.js UI — all 8 pages connected to backend APIs |
+| 5 | Frontend | **Done** | React.js UI — 8 pages (3 functional, 5 placeholder) |
 | 6 | Integration Testing | Planned | End-to-end pipeline tests, BDD scenarios |
 
 ---
@@ -191,27 +191,83 @@ Build dashboard metrics, predictive models, and anomaly detection.
 
 ---
 
-## Phase 5 — Frontend (Planned)
+## Phase 5 — Frontend (Done)
 
-### Objective
-Build 8 React.js pages connected to the backend API.
+### What Was Built
 
-### Planned Pages
+Four feature branches were merged to `main` via pull requests, building the complete React.js frontend.
 
-| Page | Route | Backend Endpoints Used |
-|------|-------|----------------------|
-| Login | `/login` | `POST /api/auth/login` |
-| Dashboard | `/dashboard` | `GET /api/analytics/dashboard` |
-| Upload | `/upload` | `POST /api/documents/upload` |
-| Processing | `/processing` | `GET /api/documents/{id}/results` |
-| Validation | `/validation` | `GET /api/documents/{id}/validation` |
-| HITL Review | `/review` | `GET /api/documents/{id}/review`, `POST /api/documents/{id}/corrections` |
-| Insights | `/insights` | `GET /api/analytics/predictions`, `GET /api/analytics/suppliers` |
-| Admin | `/admin` | User management endpoints (not yet defined) |
+#### Step 5.1: Scaffold (`feature/frontend-setup`, PR #2)
 
-### Prerequisites
-- Backend APIs for all consumed endpoints must be functional
-- UI wireframes from the UI/UX team (currently using SRS wireframes as fallback)
+| Deliverable | Detail |
+|-------------|--------|
+| React app | `create-react-app` with `react-router-dom` v6 |
+| CSS variables | `App.css` — teal primary theme, system font stack |
+| Routing | `App.js` — BrowserRouter with 8 route definitions |
+| Config | `.env` — `REACT_APP_API_URL=http://localhost:8000` |
+| Git config | Updated `.gitignore` for `frontend/node_modules/`, `frontend/build/` |
+
+#### Step 5.2: Auth & Navigation (`feature/frontend-auth`, PR #3)
+
+| Deliverable | Detail |
+|-------------|--------|
+| API client | `src/api/client.js` — shared `fetch` wrapper with JWT Bearer, auto-401 logout |
+| Auth state | `src/context/AuthContext.js` — `useReducer` + localStorage persistence |
+| Protected routes | `src/components/ProtectedRoute.js` — auth guard with `allowedRoles` prop |
+| Navigation | `src/components/Navbar.js` — NavLink with active class, admin-only link |
+| Notifications | `src/components/Toast.js` — success/error/info, auto-dismiss 3s |
+| Login page | `src/pages/LoginPage.js` — **FUNCTIONAL**, register/login toggle, API integration |
+
+**API-to-component mapping**:
+
+| API Function | Endpoint | Component |
+|-------------|----------|-----------|
+| `login()` | `POST /api/auth/login` | AuthContext → LoginPage |
+| `register()` | `POST /api/auth/register` | AuthContext → LoginPage |
+
+#### Step 5.3: Functional Pages (`feature/frontend-pages`, PR #4)
+
+| Deliverable | Detail |
+|-------------|--------|
+| Dashboard | `src/pages/DashboardPage.js` — **PARTIAL**: live health check (green/red), 4 static metric cards, 2 chart placeholders, filter/export buttons |
+| Upload | `src/pages/UploadPage.js` — **FUNCTIONAL**: drag-and-drop, file preview, `POST /api/documents/upload`, result card |
+
+**API-to-component mapping**:
+
+| API Function | Endpoint | Component |
+|-------------|----------|-----------|
+| `healthCheck()` | `GET /health` | DashboardPage |
+| `uploadDocument()` | `POST /api/documents/upload` | UploadPage |
+
+#### Step 5.4: Placeholder Pages (`feature/frontend-placeholders`, PR #5)
+
+| Deliverable | Detail |
+|-------------|--------|
+| Processing | `src/pages/ProcessingPage.js` — 4-step pipeline UI with progress bars (static) |
+| Validation | `src/pages/ValidationPage.js` — 5-row field table with valid/invalid/warning status |
+| Review | `src/pages/ReviewPage.js` — two-column split: document preview + OCR vs corrected values |
+| Insights | `src/pages/InsightsPage.js` — 3 chart placeholders, 3 risk cards, 3 AI insight cards |
+| Admin | `src/pages/AdminPage.js` — 5-row user table, role pills, admin-only via ProtectedRoute |
+
+All interactive elements on placeholder pages trigger a "Coming soon" info toast. All pages display a blue preview banner.
+
+### Production-Ready vs Placeholder
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Login page | Production-ready | Full register/login flow with API integration |
+| Auth context | Production-ready | Session persistence, auto-logout on 401, role tracking |
+| Protected routes | Production-ready | Role-based access control matches backend RBAC |
+| API client | Production-ready | JWT auth, error parsing, FormData support |
+| Upload page | Production-ready | Drag-and-drop, file validation, upload with result display |
+| Dashboard (health) | Production-ready | Live backend health check indicator |
+| Dashboard (metrics) | Placeholder | Static hardcoded numbers |
+| Dashboard (charts) | Placeholder | Gray boxes with "chart will appear" text |
+| Processing page | Placeholder | Static pipeline steps |
+| Validation page | Placeholder | Static field table |
+| Review page | Placeholder | Static OCR correction view |
+| Insights page | Placeholder | Static risk cards and AI insights |
+| Admin page | Placeholder | Static user table (admin role restriction works) |
 
 ---
 

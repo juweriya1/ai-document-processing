@@ -216,10 +216,33 @@ OCR and NLP modules should be tested with:
 2. **Prediction model tests** — Train on fixture data, verify predictions are within expected bounds
 3. **Anomaly detection tests** — Inject known anomalies into fixture data, verify they are flagged
 
-### Phase 5: Frontend
+### Phase 5: Frontend (Done — No automated tests yet)
 
-1. **Component tests** — React Testing Library for individual components
-2. **API integration tests** — Mock API responses and verify UI state updates correctly
+Phase 5 shipped without automated frontend tests. Verification was done manually via browser testing (see PHASE5_SUMMARY.md for the test flow). Future frontend testing should include:
+
+1. **Component tests** — React Testing Library for individual components:
+   ```javascript
+   test('LoginPage toggles between login and register modes', () => {
+     render(<LoginPage />);
+     expect(screen.getByText('Sign in to continue')).toBeInTheDocument();
+     fireEvent.click(screen.getByText('Register'));
+     expect(screen.getByText('Create your account')).toBeInTheDocument();
+   });
+   ```
+
+2. **API integration tests** — Mock API responses with `msw` (Mock Service Worker) and verify UI state:
+   ```javascript
+   test('UploadPage shows success after upload', async () => {
+     server.use(rest.post('/api/documents/upload', (req, res, ctx) =>
+       res(ctx.status(201), ctx.json({ id: 'doc_abc123', status: 'uploaded' }))
+     ));
+     // render, drop file, click upload, assert result card
+   });
+   ```
+
+3. **Auth flow tests** — Verify login → redirect → session persistence → logout → redirect cycle
+
+4. **Protected route tests** — Verify non-admin users cannot access `/admin` route
 
 ### Phase 6: End-to-End
 

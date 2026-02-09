@@ -1,0 +1,143 @@
+.review__title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.review__split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.review__panel {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.review__panel-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.review__preview {
+  height: 320px;
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.review__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.review__field-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 1fr;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.review__field-label {
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.review__field-ocr {
+  padding: 6px 10px;
+  background: #fef2f2;
+  border-radius: 4px;
+  color: var(--color-error);
+  font-size: 13px;
+}
+
+.review__field-corrected {
+  padding: 6px 10px;
+  background: #dcfce7;
+  border-radius: 4px;
+  color: var(--color-success);
+  font-size: 13px;
+}
+
+.review__actions {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.review__btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.review__btn--approve {
+  background-color: var(--color-success);
+}
+
+.review__btn--approve:hover {
+  background-color: #16a34a;
+}
+
+.review__btn--reject {
+  background-color: var(--color-error);
+}
+
+.review__btn--reject:hover {
+  background-color: #dc2626;
+}
+
+.review__history {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.review__history-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.review__history-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+}
+
+.review__history-item:last-child {
+  border-bottom: none;
+}
+
+.review__history-field {
+  font-weight: 500;
+}
+
+.review__history-time {
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 768px) {
+  .review__split {
+    grid-template-columns: 1fr;
+  }
+}

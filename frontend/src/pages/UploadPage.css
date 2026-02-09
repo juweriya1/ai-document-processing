@@ -1,0 +1,119 @@
+.upload__title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.upload__dropzone {
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: 48px;
+  text-align: center;
+  background: var(--color-card);
+  transition: border-color 0.15s, background-color 0.15s;
+  cursor: pointer;
+}
+
+.upload__dropzone:hover,
+.upload__dropzone--active {
+  border-color: var(--color-primary);
+  background-color: #f0fdfa;
+}
+
+.upload__dropzone-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+  color: var(--color-text-muted);
+}
+
+.upload__dropzone-text {
+  font-size: 15px;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+}
+
+.upload__browse-btn {
+  padding: 8px 20px;
+  background-color: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.upload__browse-btn:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.upload__file-info {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.upload__file-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.upload__file-size {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-left: 12px;
+}
+
+.upload__submit-btn {
+  padding: 10px 24px;
+  background-color: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.upload__submit-btn:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.upload__submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.upload__result {
+  background: var(--color-card);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.upload__result-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-success);
+  margin-bottom: 12px;
+}
+
+.upload__result-grid {
+  display: grid;
+  grid-template-columns: 140px 1fr;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.upload__result-label {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.upload__result-value {
+  color: var(--color-text);
+}

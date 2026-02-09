@@ -35,7 +35,12 @@ class FileUpload:
 
     def save_uploaded_file(self, file) -> DocumentMeta:
         ext = self.validate_file_type(file.filename)
-        content = file.read() if hasattr(file, 'read') and callable(file.read) else b""
+        if hasattr(file, 'file'):
+            content = file.file.read()
+        elif hasattr(file, 'read') and callable(file.read):
+            content = file.read()
+        else:
+            content = b""
         self.validate_file_size(content)
 
         stored_filename = self.get_stored_filename(ext)

@@ -1,0 +1,116 @@
+.dashboard__header {
+  margin-bottom: 24px;
+}
+
+.dashboard__title {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.dashboard__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.dashboard__status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dashboard__status-dot--healthy {
+  background-color: var(--color-success);
+}
+
+.dashboard__status-dot--error {
+  background-color: var(--color-error);
+}
+
+.dashboard__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.dashboard__metric-card {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.dashboard__metric-label {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.dashboard__metric-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.dashboard__metric-change {
+  font-size: 12px;
+  margin-top: 4px;
+  color: var(--color-success);
+}
+
+.dashboard__charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.dashboard__chart-card {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+}
+
+.dashboard__chart-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.dashboard__chart-placeholder {
+  height: 180px;
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.dashboard__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dashboard__action-btn {
+  padding: 10px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-card);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+  transition: border-color 0.15s;
+}
+
+.dashboard__action-btn:hover {
+  border-color: var(--color-primary);
+}

@@ -1,79 +1,229 @@
+import { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import {
+  getDocumentFields,
+  getDocumentCorrections,
+  approveDocument,
+  rejectDocument,
+  getDocumentStatus,
+} from '../api/client';
 import { useToast } from '../components/Toast';
 import './ReviewPage.css';
 
-const MOCK_FIELDS = [
-  { label: 'Invoice #', ocr: 'INV-2024-03I2', corrected: 'INV-2024-0312' },
-  { label: 'Date', ocr: '2024-O3-15', corrected: '2024-03-15' },
-  { label: 'Vendor', ocr: 'Acme Corp', corrected: 'Acme Corp.' },
-  { label: 'Amount', ocr: '$14,58O.OO', corrected: '$14,580.00' },
-  { label: 'PO Number', ocr: '', corrected: 'PO-2024-0089' },
-];
-
-const HISTORY = [
-  { field: 'Invoice #', change: 'I \u2192 1 (OCR correction)', time: '2 min ago' },
-  { field: 'Date', change: 'O \u2192 0 (OCR correction)', time: '2 min ago' },
-  { field: 'PO Number', change: 'Added manually', time: '1 min ago' },
-];
-
 export default function ReviewPage() {
+  const { documentId: paramId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const toast = useToast();
 
-  const handleAction = () => {
-    toast('Coming soon — HITL review not yet connected', 'info');
+  const [docId, setDocId] = useState(paramId || '');
+  const [fields, setFields] = useState([]);
+  const [corrections, setCorrections] = useState([]);
+  const [docStatus, setDocStatus] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [showRejectInput, setShowRejectInput] = useState(false);
+
+  const isReviewerOrAdmin = user?.role === 'reviewer' || user?.role === 'admin';
+
+  useEffect(() => {
+    if (paramId) {
+      setDocId(paramId);
+      loadData(paramId);
+    }
+  }, [paramId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadData = async (id) => {
+    setLoading(true);
+    try {
+      const [fieldsData, statusData] = await Promise.all([
+        getDocumentFields(id),
+        getDocumentStatus(id),
+      ]);
+      setFields(fieldsData);
+      setDocStatus(statusData);
+
+      if (isReviewerOrAdmin) {
+        try {
+          const corr = await getDocumentCorrections(id);
+          setCorrections(corr);
+        } catch {
+          setCorrections([]);
+        }
+      }
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleLoad = () => {
+    if (!docId.trim()) {
+      toast('Please enter a document ID', 'error');
+      return;
+    }
+    loadData(docId.trim());
+  };
+
+  const handleApprove = async () => {
+    try {
+      await approveDocument(docId.trim());
+      toast('Document approved', 'success');
+      await loadData(docId.trim());
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
+
+  const handleReject = async () => {
+    if (!rejectReason.trim()) {
+      toast('Please provide a rejection reason', 'error');
+      return;
+    }
+    try {
+      await rejectDocument(docId.trim(), rejectReason.trim());
+      toast('Document rejected', 'success');
+      setShowRejectInput(false);
+      setRejectReason('');
+      await loadData(docId.trim());
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
+
+  const isTerminal = docStatus?.status === 'approved' || docStatus?.status === 'rejected';
 
   return (
     <div>
       <h1 className="review__title">Human-in-the-Loop Review</h1>
-      <div className="placeholder-banner">
-        Preview layout — HITL review will be connected in a future phase.
-      </div>
 
-      <div className="review__split">
-        <div className="review__panel">
-          <div className="review__panel-title">Document Preview</div>
-          <div className="review__preview">
-            Invoice preview will render here when OCR pipeline is connected
+      {!paramId && (
+        <div className="review__input-section">
+          <label className="review__input-label">Document ID</label>
+          <div className="review__input-row">
+            <input
+              type="text"
+              className="review__input"
+              value={docId}
+              onChange={(e) => setDocId(e.target.value)}
+              placeholder="Enter document ID (UUID)"
+            />
+            <button className="review__load-btn" onClick={handleLoad}>
+              Load Review
+            </button>
           </div>
         </div>
+      )}
 
-        <div className="review__panel">
-          <div className="review__panel-title">Extracted Fields</div>
-          <div className="review__fields">
-            <div className="review__field-row" style={{ fontWeight: 600, fontSize: '12px', color: 'var(--color-text-muted)' }}>
-              <span>Field</span>
-              <span>OCR Output</span>
-              <span>Corrected</span>
+      {loading && (
+        <div className="review__loading">Loading review data...</div>
+      )}
+
+      {docStatus && (
+        <div className={`review__status-banner review__status-banner--${docStatus.status}`}>
+          Document: {docStatus.filename || docStatus.document_id} &mdash; Status:{' '}
+          <strong>{docStatus.status}</strong>
+        </div>
+      )}
+
+      {fields.length > 0 && (
+        <div className="review__split">
+          <div className="review__panel">
+            <div className="review__panel-title">Document Preview</div>
+            <div className="review__preview">
+              Document preview will render here when OCR pipeline is fully connected
             </div>
-            {MOCK_FIELDS.map((f) => (
-              <div className="review__field-row" key={f.label}>
-                <span className="review__field-label">{f.label}</span>
-                <span className="review__field-ocr">{f.ocr || '\u2014'}</span>
-                <span className="review__field-corrected">{f.corrected}</span>
+          </div>
+
+          <div className="review__panel">
+            <div className="review__panel-title">Extracted Fields</div>
+            <div className="review__fields">
+              <div className="review__field-row" style={{ fontWeight: 600, fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                <span>Field</span>
+                <span>Value</span>
+                <span>Status</span>
               </div>
-            ))}
+              {fields.map((f) => (
+                <div className="review__field-row" key={f.id}>
+                  <span className="review__field-label">{f.fieldName}</span>
+                  <span className={f.status === 'corrected' ? 'review__field-corrected' : 'review__field-value'}>
+                    {f.fieldValue || '\u2014'}
+                  </span>
+                  <span className={`validation__status validation__status--${f.status}`}>
+                    {f.status}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="review__actions">
-        <button className="review__btn review__btn--approve" onClick={handleAction}>
-          Approve
-        </button>
-        <button className="review__btn review__btn--reject" onClick={handleAction}>
-          Reject
-        </button>
-      </div>
+      {isReviewerOrAdmin && fields.length > 0 && !isTerminal && (
+        <div className="review__actions">
+          <button className="review__btn review__btn--approve" onClick={handleApprove}>
+            Approve
+          </button>
+          {showRejectInput ? (
+            <div className="review__reject-form">
+              <input
+                type="text"
+                className="review__reject-input"
+                placeholder="Reason for rejection"
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                autoFocus
+              />
+              <button className="review__btn review__btn--reject" onClick={handleReject}>
+                Confirm Reject
+              </button>
+              <button
+                className="review__btn review__btn--cancel"
+                onClick={() => { setShowRejectInput(false); setRejectReason(''); }}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              className="review__btn review__btn--reject"
+              onClick={() => setShowRejectInput(true)}
+            >
+              Reject
+            </button>
+          )}
+        </div>
+      )}
 
-      <div className="review__history">
-        <div className="review__history-title">Correction History</div>
-        {HISTORY.map((h, i) => (
-          <div className="review__history-item" key={i}>
-            <span className="review__history-field">{h.field}: {h.change}</span>
-            <span className="review__history-time">{h.time}</span>
-          </div>
-        ))}
-      </div>
+      {isTerminal && (
+        <div className={`review__final-status review__final-status--${docStatus.status}`}>
+          This document has been <strong>{docStatus.status}</strong>.
+        </div>
+      )}
+
+      {corrections.length > 0 && (
+        <div className="review__history">
+          <div className="review__history-title">Correction History</div>
+          {corrections.map((c, i) => (
+            <div className="review__history-item" key={i}>
+              <span className="review__history-field">
+                {c.field_name}: &ldquo;{c.original_value}&rdquo; &rarr; &ldquo;{c.corrected_value}&rdquo;
+              </span>
+              <span className="review__history-time">
+                {c.corrected_at ? new Date(c.corrected_at).toLocaleString() : ''}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && fields.length === 0 && docId && paramId && (
+        <div className="review__empty">
+          No data available. Process and validate the document first.
+        </div>
+      )}
     </div>
   );
 }

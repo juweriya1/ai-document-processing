@@ -142,3 +142,71 @@
   color: var(--color-text-muted);
   line-height: 1.6;
 }
+
+.insights__loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.insights__data-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.insights__data-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.insights__data-row--anomaly {
+  background: #fef2f2;
+}
+
+.insights__data-label {
+  font-weight: 500;
+}
+
+.insights__data-value {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.insights__empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  margin-bottom: 24px;
+}
+
+.insights__forecast {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.insights__forecast-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.insights__risk-card--unknown {
+  border-left-color: var(--color-text-muted);
+}
+
+.insights__risk-card--unknown .insights__risk-level {
+  color: var(--color-text-muted);
+}

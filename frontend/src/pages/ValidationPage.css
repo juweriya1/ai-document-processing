@@ -102,3 +102,117 @@
 .validation__footer-btn--reject {
   background-color: var(--color-error);
 }
+
+.validation__input-section {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.validation__input-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.validation__input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.validation__input {
+  flex: 1;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 14px;
+}
+
+.validation__input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.validation__load-btn {
+  padding: 10px 20px;
+  background-color: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.validation__load-btn:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.validation__loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.validation__summary {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.validation__summary-item {
+  padding: 6px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+}
+
+.validation__summary-item--valid {
+  background: #dcfce7;
+  color: var(--color-success);
+}
+
+.validation__summary-item--invalid {
+  background: #fef2f2;
+  color: var(--color-error);
+}
+
+.validation__summary-item--corrected {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.validation__edit-input {
+  padding: 6px 10px;
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  font-size: 14px;
+  width: 100%;
+}
+
+.validation__status--pending {
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+}
+
+.validation__status--corrected {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.validation__empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  background: var(--color-bg);
+  border-radius: var(--radius);
+}

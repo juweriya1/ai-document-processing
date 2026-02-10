@@ -49,7 +49,7 @@ class User(Base):
     role = Column(String, nullable=False, default="enterprise_user")
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
-    documents = relationship("Document", back_populates="uploader")
+    documents = relationship("Document", back_populates="uploader", foreign_keys="[Document.uploaded_by]")
     corrections = relationship("Correction", back_populates="reviewer")
 
 
@@ -65,8 +65,12 @@ class Document(Base):
     uploaded_by = Column(String, ForeignKey("users.id"), nullable=True)
     uploaded_at = Column(DateTime(timezone=True), default=utcnow)
     processed_at = Column(DateTime(timezone=True), nullable=True)
+    approved_by = Column(String, ForeignKey("users.id"), nullable=True)
+    approved_at = Column(DateTime(timezone=True), nullable=True)
+    rejected_reason = Column(Text, nullable=True)
 
-    uploader = relationship("User", back_populates="documents")
+    uploader = relationship("User", back_populates="documents", foreign_keys=[uploaded_by])
+    approver = relationship("User", foreign_keys=[approved_by])
     extracted_fields = relationship("ExtractedField", back_populates="document")
     line_items = relationship("LineItem", back_populates="document")
     corrections = relationship("Correction", back_populates="document")
@@ -80,6 +84,8 @@ class ExtractedField(Base):
     field_name = Column(String, nullable=False)
     field_value = Column(Text, nullable=True)
     confidence = Column(Float, nullable=True)
+    status = Column(String, nullable=False, default="pending")
+    error_message = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     document = relationship("Document", back_populates="extracted_fields")

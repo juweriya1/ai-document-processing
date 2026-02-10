@@ -1,7 +1,17 @@
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
-from src.backend.db.models import Correction, Document, ExtractedField, LineItem, User
+from sqlalchemy import func
+
+from src.backend.db.models import (
+    AnalyticsSummary,
+    Correction,
+    Document,
+    ExtractedField,
+    LineItem,
+    SupplierMetric,
+    User,
+)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -184,3 +194,175 @@ def get_line_items(db: Session, document_id: str) -> list[LineItem]:
         .filter(LineItem.document_id == document_id)
         .all()
     )
+
+
+def get_spend_by_vendor(db: Session) -> list[dict]:
+    docs = db.query(Document).all()
+    vendor_data: dict[str, dict] = {}
+    for doc in docs:
+        fields = get_extracted_fields(db, doc.id)
+        vendor_field = next(
+            (f for f in fields if f.field_name == "vendor_name"), None
+        )
+        amount_field = next(
+            (f for f in fields if f.field_name == "total_amount"), None
+        )
+        if not vendor_field or not vendor_field.field_value:
+            continue
+        vendor = vendor_field.field_value
+        amount = 0.0
+        if amount_field and amount_field.field_value:
+            try:
+                amount = float(amount_field.field_value)
+            except (ValueError, TypeError):
+                pass
+        if vendor not in vendor_data:
+            vendor_data[vendor] = {"total_spend": 0.0, "document_count": 0}
+        vendor_data[vendor]["total_spend"] += amount
+        vendor_data[vendor]["document_count"] += 1
+    return [
+        {
+            "vendor_name": vendor,
+            "total_spend": data["total_spend"],
+            "document_count": data["document_count"],
+        }
+        for vendor, data in vendor_data.items()
+    ]
+
+
+def get_spend_by_month(db: Session) -> list[dict]:
+    rows = (
+        db.query(Document)
+        .filter(Document.status.in_(["approved", "review_pending", "rejected"]))
+        .all()
+    )
+    monthly: dict[str, float] = {}
+    for doc in rows:
+        month_key = doc.uploaded_at.strftime("%Y-%m") if doc.uploaded_at else "unknown"
+        amount_field = (
+            db.query(ExtractedField)
+            .filter(
+                ExtractedField.document_id == doc.id,
+                ExtractedField.field_name == "total_amount",
+            )
+            .first()
+        )
+        amount = 0.0
+        if amount_field and amount_field.field_value:
+            try:
+                amount = float(amount_field.field_value)
+            except (ValueError, TypeError):
+                pass
+        monthly[month_key] = monthly.get(month_key, 0.0) + amount
+    return [
+        {"month": k, "total_spend": v}
+        for k, v in sorted(monthly.items())
+    ]
+
+
+def get_all_supplier_metrics(db: Session) -> list[SupplierMetric]:
+    return db.query(SupplierMetric).all()
+
+
+def upsert_supplier_metric(
+    db: Session,
+    supplier_name: str,
+    total_documents: int,
+    avg_confidence: float | None = None,
+    risk_score: float | None = None,
+) -> SupplierMetric:
+    existing = (
+        db.query(SupplierMetric)
+        .filter(SupplierMetric.supplier_name == supplier_name)
+        .first()
+    )
+    if existing:
+        existing.total_documents = total_documents
+        existing.avg_confidence = avg_confidence
+        existing.risk_score = risk_score
+    else:
+        existing = SupplierMetric(
+            supplier_name=supplier_name,
+            total_documents=total_documents,
+            avg_confidence=avg_confidence,
+            risk_score=risk_score,
+        )
+        db.add(existing)
+    db.commit()
+    db.refresh(existing)
+    return existing
+
+
+def upsert_analytics_summary(
+    db: Session,
+    metric_name: str,
+    metric_value: float,
+    period: str | None = None,
+) -> AnalyticsSummary:
+    existing = (
+        db.query(AnalyticsSummary)
+        .filter(
+            AnalyticsSummary.metric_name == metric_name,
+            AnalyticsSummary.period == period,
+        )
+        .first()
+    )
+    if existing:
+        existing.metric_value = metric_value
+    else:
+        existing = AnalyticsSummary(
+            metric_name=metric_name,
+            metric_value=metric_value,
+            period=period,
+        )
+        db.add(existing)
+    db.commit()
+    db.refresh(existing)
+    return existing
+
+
+def get_analytics_summaries(
+    db: Session, metric_name: str | None = None
+) -> list[AnalyticsSummary]:
+    query = db.query(AnalyticsSummary)
+    if metric_name:
+        query = query.filter(AnalyticsSummary.metric_name == metric_name)
+    return query.all()
+
+
+def get_documents_with_confidence_stats(db: Session) -> list[dict]:
+    docs = db.query(Document).all()
+    results = []
+    for doc in docs:
+        fields = get_extracted_fields(db, doc.id)
+        confidences = [f.confidence for f in fields if f.confidence is not None]
+        avg_conf = sum(confidences) / len(confidences) if confidences else None
+        total_field = next(
+            (f for f in fields if f.field_name == "total_amount"), None
+        )
+        total_amount = None
+        if total_field and total_field.field_value:
+            try:
+                total_amount = float(total_field.field_value)
+            except (ValueError, TypeError):
+                pass
+        corrections = get_corrections_by_document(db, doc.id)
+        results.append({
+            "document_id": doc.id,
+            "filename": doc.original_filename,
+            "status": doc.status,
+            "avg_confidence": avg_conf,
+            "total_amount": total_amount,
+            "correction_count": len(corrections),
+            "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+        })
+    return results
+
+
+def get_processing_stats(db: Session) -> dict:
+    rows = (
+        db.query(Document.status, func.count(Document.id))
+        .group_by(Document.status)
+        .all()
+    )
+    return {status: count for status, count in rows}

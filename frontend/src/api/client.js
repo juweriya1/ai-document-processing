@@ -36,6 +36,7 @@ async function request(endpoint, options = {}) {
   return response.json();
 }
 
+// Auth
 export function healthCheck() {
   return request('/health');
 }
@@ -54,6 +55,7 @@ export function register(email, password, name, role) {
   });
 }
 
+// Documents
 export function uploadDocument(file) {
   const formData = new FormData();
   formData.append('file', file);
@@ -61,4 +63,80 @@ export function uploadDocument(file) {
     method: 'POST',
     body: formData,
   });
+}
+
+export function processDocument(documentId) {
+  return request(`/api/documents/${documentId}/process`, {
+    method: 'POST',
+  });
+}
+
+export function getDocumentStatus(documentId) {
+  return request(`/api/documents/${documentId}/status`);
+}
+
+// Validation
+export function getDocumentFields(documentId) {
+  return request(`/api/documents/${documentId}/fields`);
+}
+
+export function validateDocument(documentId) {
+  return request(`/api/documents/${documentId}/validate`, {
+    method: 'POST',
+  });
+}
+
+export function submitCorrection(documentId, fieldId, correctedValue) {
+  return request(`/api/documents/${documentId}/corrections`, {
+    method: 'POST',
+    body: JSON.stringify({ fieldId, correctedValue }),
+  });
+}
+
+export function getDocumentCorrections(documentId) {
+  return request(`/api/documents/${documentId}/corrections`);
+}
+
+export function approveDocument(documentId) {
+  return request(`/api/documents/${documentId}/approve`, {
+    method: 'POST',
+  });
+}
+
+export function rejectDocument(documentId, reason) {
+  return request(`/api/documents/${documentId}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ reason }),
+  });
+}
+
+// Analytics
+export function getDashboard() {
+  return request('/api/analytics/dashboard');
+}
+
+export function getSpendByVendor() {
+  return request('/api/analytics/spend/by-vendor');
+}
+
+export function getSpendByMonth(months = 12) {
+  return request(`/api/analytics/spend/by-month?months=${months}`);
+}
+
+export function getSuppliers() {
+  return request('/api/analytics/suppliers');
+}
+
+export function refreshSuppliers() {
+  return request('/api/analytics/suppliers/refresh', {
+    method: 'POST',
+  });
+}
+
+export function getPredictions() {
+  return request('/api/analytics/predictions');
+}
+
+export function getAnomalies() {
+  return request('/api/analytics/anomalies');
 }

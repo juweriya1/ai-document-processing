@@ -36,6 +36,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/processing/:documentId"
+          element={
+            <ProtectedRoute>
+              <div className="app__content"><ProcessingPage /></div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/processing"
           element={
             <ProtectedRoute>
@@ -44,10 +52,26 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/validation/:documentId"
+          element={
+            <ProtectedRoute>
+              <div className="app__content"><ValidationPage /></div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/validation"
           element={
             <ProtectedRoute>
               <div className="app__content"><ValidationPage /></div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/review/:documentId"
+          element={
+            <ProtectedRoute>
+              <div className="app__content"><ReviewPage /></div>
             </ProtectedRoute>
           }
         />

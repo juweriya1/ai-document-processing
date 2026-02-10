@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { uploadDocument } from '../api/client';
 import { useToast } from '../components/Toast';
 import './UploadPage.css';
@@ -16,6 +17,7 @@ export default function UploadPage() {
   const [result, setResult] = useState(null);
   const inputRef = useRef(null);
   const toast = useToast();
+  const navigate = useNavigate();
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -121,6 +123,14 @@ export default function UploadPage() {
             <span className="upload__result-value">{formatSize(result.fileSize)}</span>
             <span className="upload__result-label">Status</span>
             <span className="upload__result-value">{result.status}</span>
+          </div>
+          <div className="upload__result-actions">
+            <button
+              className="upload__process-btn"
+              onClick={() => navigate(`/processing/${result.id}`)}
+            >
+              Process Document
+            </button>
           </div>
         </div>
       )}

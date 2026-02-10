@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from passlib.context import CryptContext
 
-from src.backend.db.models import Document, ExtractedField, User
+from src.backend.db.models import Correction, Document, ExtractedField, LineItem, User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -80,3 +80,107 @@ def get_user_by_email(db: Session, email: str) -> User | None:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_extracted_fields(db: Session, document_id: str) -> list[ExtractedField]:
+    return (
+        db.query(ExtractedField)
+        .filter(ExtractedField.document_id == document_id)
+        .all()
+    )
+
+
+def get_field_by_id(db: Session, field_id: str) -> ExtractedField | None:
+    return db.query(ExtractedField).filter(ExtractedField.id == field_id).first()
+
+
+def update_field_value(
+    db: Session, field_id: str, new_value: str
+) -> ExtractedField | None:
+    field = get_field_by_id(db, field_id)
+    if field is None:
+        return None
+    field.field_value = new_value
+    db.commit()
+    db.refresh(field)
+    return field
+
+
+def update_field_validation_status(
+    db: Session, field_id: str, status: str, error_message: str | None = None
+) -> ExtractedField | None:
+    field = get_field_by_id(db, field_id)
+    if field is None:
+        return None
+    field.status = status
+    field.error_message = error_message
+    db.commit()
+    db.refresh(field)
+    return field
+
+
+def create_correction(
+    db: Session,
+    document_id: str,
+    field_id: str,
+    original_value: str | None,
+    corrected_value: str,
+    reviewed_by: str | None = None,
+) -> Correction:
+    correction = Correction(
+        document_id=document_id,
+        field_id=field_id,
+        original_value=original_value,
+        corrected_value=corrected_value,
+        reviewed_by=reviewed_by,
+    )
+    db.add(correction)
+    db.commit()
+    db.refresh(correction)
+    return correction
+
+
+def get_corrections_by_document(db: Session, document_id: str) -> list[Correction]:
+    return (
+        db.query(Correction)
+        .filter(Correction.document_id == document_id)
+        .all()
+    )
+
+
+def update_document_status(db: Session, document_id: str, status: str) -> Document | None:
+    doc = get_document(db, document_id)
+    if doc is None:
+        return None
+    doc.status = status
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
+def store_line_items(
+    db: Session, document_id: str, items: list[dict]
+) -> list[LineItem]:
+    stored = []
+    for item_data in items:
+        item = LineItem(
+            document_id=document_id,
+            description=item_data.get("description"),
+            quantity=item_data.get("quantity"),
+            unit_price=item_data.get("unit_price"),
+            total=item_data.get("total"),
+        )
+        db.add(item)
+        stored.append(item)
+    db.commit()
+    for li in stored:
+        db.refresh(li)
+    return stored
+
+
+def get_line_items(db: Session, document_id: str) -> list[LineItem]:
+    return (
+        db.query(LineItem)
+        .filter(LineItem.document_id == document_id)
+        .all()
+    )

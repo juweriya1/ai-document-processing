@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Float,
@@ -47,6 +48,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     name = Column(String, nullable=False)
     role = Column(String, nullable=False, default="enterprise_user")
+    is_active = Column(Boolean, nullable=False, default=True, server_default="true")
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     documents = relationship("Document", back_populates="uploader", foreign_keys="[Document.uploaded_by]")

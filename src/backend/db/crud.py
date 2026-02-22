@@ -88,6 +88,35 @@ def get_user_by_email(db: Session, email: str) -> User | None:
     return db.query(User).filter(User.email == email).first()
 
 
+def list_all_users(db: Session) -> list[User]:
+    return db.query(User).all()
+
+
+def get_user_by_id(db: Session, user_id: str) -> User | None:
+    return db.query(User).filter(User.id == user_id).first()
+
+
+def update_user(
+    db: Session,
+    user_id: str,
+    name: str | None = None,
+    role: str | None = None,
+    is_active: bool | None = None,
+) -> User | None:
+    user = get_user_by_id(db, user_id)
+    if user is None:
+        return None
+    if name is not None:
+        user.name = name
+    if role is not None:
+        user.role = role
+    if is_active is not None:
+        user.is_active = is_active
+    db.commit()
+    db.refresh(user)
+    return user
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 

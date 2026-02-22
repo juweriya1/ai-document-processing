@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -7,13 +7,14 @@ import {
   approveDocument,
   rejectDocument,
   getDocumentStatus,
+  getDocumentFileUrl,
 } from '../api/client';
 import { useToast } from '../components/Toast';
 import './ReviewPage.css';
 
 export default function ReviewPage() {
   const { documentId: paramId } = useParams();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // eslint-disable-line no-unused-vars
   const { user } = useAuth();
   const toast = useToast();
 
@@ -24,6 +25,8 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
+  const [documentBlobUrl, setDocumentBlobUrl] = useState(null);
+  const blobUrlRef = useRef(null);
 
   const isReviewerOrAdmin = user?.role === 'reviewer' || user?.role === 'admin';
 
@@ -34,6 +37,14 @@ export default function ReviewPage() {
     }
   }, [paramId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+    };
+  }, []);
+
   const loadData = async (id) => {
     setLoading(true);
     try {
@@ -43,6 +54,8 @@ export default function ReviewPage() {
       ]);
       setFields(fieldsData);
       setDocStatus(statusData);
+
+      loadDocumentPreview(id);
 
       if (isReviewerOrAdmin) {
         try {
@@ -56,6 +69,26 @@ export default function ReviewPage() {
       toast(err.message, 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadDocumentPreview = async (id) => {
+    try {
+      const fileUrl = getDocumentFileUrl(id);
+      const token = localStorage.getItem('idp_token');
+      const response = await fetch(fileUrl, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      });
+      if (!response.ok) return;
+      const blob = await response.blob();
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+      const blobUrl = URL.createObjectURL(blob);
+      blobUrlRef.current = blobUrl;
+      setDocumentBlobUrl(blobUrl);
+    } catch {
+      // Preview not available
     }
   };
 
@@ -95,6 +128,8 @@ export default function ReviewPage() {
 
   const isTerminal = docStatus?.status === 'approved' || docStatus?.status === 'rejected';
 
+  const isPdf = docStatus?.filename?.toLowerCase().endsWith('.pdf');
+
   return (
     <div>
       <h1 className="review__title">Human-in-the-Loop Review</h1>
@@ -133,7 +168,23 @@ export default function ReviewPage() {
           <div className="review__panel">
             <div className="review__panel-title">Document Preview</div>
             <div className="review__preview">
-              Document preview will render here when OCR pipeline is fully connected
+              {documentBlobUrl ? (
+                isPdf ? (
+                  <iframe
+                    src={documentBlobUrl}
+                    title="Document Preview"
+                    style={{ width: '100%', height: '600px', border: 'none' }}
+                  />
+                ) : (
+                  <img
+                    src={documentBlobUrl}
+                    alt="Document Preview"
+                    style={{ maxWidth: '100%', height: 'auto' }}
+                  />
+                )
+              ) : (
+                <span>Document preview not available</span>
+              )}
             </div>
           </div>
 

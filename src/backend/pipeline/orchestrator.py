@@ -1,3 +1,5 @@
+import logging
+import os
 from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
@@ -9,6 +11,8 @@ from src.backend.db.crud import (
     update_document_status,
 )
 from src.backend.validation.schema_validator import validate_document_fields
+
+logger = logging.getLogger(__name__)
 
 
 class ExtractorInterface:
@@ -32,10 +36,33 @@ class MockExtractor(ExtractorInterface):
         return fields, line_items
 
 
+class RealExtractor(ExtractorInterface):
+    def __init__(self):
+        from src.backend.ingestion.preprocessing import Preprocessing
+        from src.backend.ocr.ocr_engine import OCREngine
+        from src.backend.extraction.entity_extractor import EntityExtractor
+
+        self._preprocessing = Preprocessing()
+        self._ocr_engine = OCREngine()
+        self._entity_extractor = EntityExtractor()
+
+    def extract(self, document_id: str, filename: str) -> tuple[list[dict], list[dict]]:
+        pdf_path = os.path.join("uploads", filename)
+
+        try:
+            pages = self._preprocessing.preprocess_document(pdf_path)
+            ocr_result = self._ocr_engine.process_document(pages, pdf_path=pdf_path)
+            extracted = self._entity_extractor.extract(ocr_result)
+            return extracted.fields, extracted.line_items
+        except Exception as e:
+            logger.error("RealExtractor failed for document %s: %s", document_id, e)
+            return [], []
+
+
 class PipelineOrchestrator:
     def __init__(self, db: Session, extractor: ExtractorInterface | None = None):
         self.db = db
-        self.extractor = extractor or MockExtractor()
+        self.extractor = extractor or RealExtractor()
 
     def process_document(self, document_id: str) -> dict:
         doc = get_document(self.db, document_id)

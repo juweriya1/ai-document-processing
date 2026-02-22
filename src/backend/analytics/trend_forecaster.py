@@ -40,11 +40,14 @@ def forecast_spend(db: Session, forecast_months: int = 3) -> dict:
 
 def _arima_forecast(values: list[float], steps: int) -> tuple[list[float], str]:
     try:
+        import warnings
         from statsmodels.tsa.arima.model import ARIMA
 
-        model = ARIMA(values, order=(1, 1, 1))
-        fitted = model.fit()
-        prediction = fitted.forecast(steps=steps)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            model = ARIMA(values, order=(1, 1, 0))
+            fitted = model.fit()
+            prediction = fitted.forecast(steps=steps)
         return [max(0, float(v)) for v in prediction], "arima"
     except Exception:
         return _linear_forecast(values, steps)

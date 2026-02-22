@@ -1,23 +1,87 @@
-import { useState } from 'react';
-import { refreshSuppliers } from '../api/client';
+import { useState, useEffect } from 'react';
+import {
+  refreshSuppliers,
+  listUsers,
+  createUser,
+  updateUser,
+  deactivateUser,
+  activateUser,
+} from '../api/client';
 import { useToast } from '../components/Toast';
 import './AdminPage.css';
-
-const USERS = [
-  { name: 'Fatima Naeem', email: 'fatima@idp.com', role: 'admin', status: 'active' },
-  { name: 'Maheen Rizwan', email: 'maheen@idp.com', role: 'reviewer', status: 'active' },
-  { name: 'Juweriya Nasir', email: 'juweriya@idp.com', role: 'reviewer', status: 'active' },
-  { name: 'Ali Khan', email: 'ali@enterprise.com', role: 'enterprise_user', status: 'active' },
-  { name: 'Sara Ahmed', email: 'sara@enterprise.com', role: 'enterprise_user', status: 'inactive' },
-];
 
 export default function AdminPage() {
   const toast = useToast();
   const [refreshing, setRefreshing] = useState(false);
   const [refreshResult, setRefreshResult] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newUser, setNewUser] = useState({ email: '', password: '', name: '', role: 'enterprise_user' });
 
-  const handleUserAction = () => {
-    toast('Coming soon — user management not yet connected', 'info');
+  useEffect(() => {
+    loadUsers();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadUsers = async () => {
+    setLoadingUsers(true);
+    try {
+      const data = await listUsers();
+      setUsers(data);
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    if (!newUser.email || !newUser.password || !newUser.name) {
+      toast('Please fill in all required fields', 'error');
+      return;
+    }
+    try {
+      await createUser(newUser.email, newUser.password, newUser.name, newUser.role);
+      toast('User created successfully', 'success');
+      setShowAddForm(false);
+      setNewUser({ email: '', password: '', name: '', role: 'enterprise_user' });
+      await loadUsers();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
+
+  const handleToggleStatus = async (userId, currentlyActive) => {
+    try {
+      if (currentlyActive) {
+        await deactivateUser(userId);
+        toast('User deactivated', 'success');
+      } else {
+        await activateUser(userId);
+        toast('User activated', 'success');
+      }
+      await loadUsers();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
+
+  const handleEditRole = async (userId, currentRole) => {
+    const roles = ['admin', 'reviewer', 'enterprise_user'].filter(r => r !== currentRole);
+    const newRole = window.prompt(`Current role: ${currentRole}\nEnter new role (${roles.join(', ')}):`);
+    if (!newRole) return;
+    if (!['admin', 'reviewer', 'enterprise_user'].includes(newRole)) {
+      toast('Invalid role', 'error');
+      return;
+    }
+    try {
+      await updateUser(userId, null, newRole);
+      toast('Role updated', 'success');
+      await loadUsers();
+    } catch (err) {
+      toast(err.message, 'error');
+    }
   };
 
   const handleRefreshSuppliers = async () => {
@@ -87,52 +151,100 @@ export default function AdminPage() {
 
       <div className="admin__section">
         <h2 className="admin__section-title">User Management</h2>
-        <div className="placeholder-banner">
-          User management API not yet available. Displaying placeholder data.
-        </div>
 
         <div className="admin__actions">
-          <button className="admin__add-btn" onClick={handleUserAction}>
-            Add User
+          <button className="admin__add-btn" onClick={() => setShowAddForm(!showAddForm)}>
+            {showAddForm ? 'Cancel' : 'Add User'}
           </button>
         </div>
 
+        {showAddForm && (
+          <form className="admin__add-form" onSubmit={handleAddUser}>
+            <input
+              type="text"
+              placeholder="Name"
+              value={newUser.name}
+              onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+              required
+            />
+            <input
+              type="email"
+              placeholder="Email"
+              value={newUser.email}
+              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+              required
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={newUser.password}
+              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+              required
+            />
+            <select
+              value={newUser.role}
+              onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+            >
+              <option value="enterprise_user">Enterprise User</option>
+              <option value="reviewer">Reviewer</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button type="submit" className="admin__add-btn">Create</button>
+          </form>
+        )}
+
         <div className="admin__table-wrap">
-          <table className="admin__table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {USERS.map((u) => (
-                <tr key={u.email}>
-                  <td>{u.name}</td>
-                  <td>{u.email}</td>
-                  <td>
-                    <span className={`admin__role-pill admin__role-pill--${u.role}`}>
-                      {u.role.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={u.status === 'active' ? 'admin__status-active' : 'admin__status-inactive'}>
-                      {u.status}
-                    </span>
-                  </td>
-                  <td>
-                    <button className="admin__action-btn" onClick={handleUserAction}>Edit</button>
-                    <button className="admin__action-btn admin__action-btn--danger" onClick={handleUserAction}>
-                      {u.status === 'active' ? 'Deactivate' : 'Activate'}
-                    </button>
-                  </td>
+          {loadingUsers ? (
+            <div className="admin__loading">Loading users...</div>
+          ) : (
+            <table className="admin__table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id}>
+                    <td>{u.name}</td>
+                    <td>{u.email}</td>
+                    <td>
+                      <span className={`admin__role-pill admin__role-pill--${u.role}`}>
+                        {u.role.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={u.is_active ? 'admin__status-active' : 'admin__status-inactive'}>
+                        {u.is_active ? 'active' : 'inactive'}
+                      </span>
+                    </td>
+                    <td>
+                      <button className="admin__action-btn" onClick={() => handleEditRole(u.id, u.role)}>
+                        Edit Role
+                      </button>
+                      <button
+                        className={`admin__action-btn ${u.is_active ? 'admin__action-btn--danger' : ''}`}
+                        onClick={() => handleToggleStatus(u.id, u.is_active)}
+                      >
+                        {u.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {users.length === 0 && (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>
+                      No users found
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

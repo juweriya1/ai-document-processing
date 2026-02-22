@@ -1,4 +1,4 @@
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const API_URL = process.env.REACT_APP_API_URL || '';
 
 function getToken() {
   return localStorage.getItem('idp_token');
@@ -139,4 +139,42 @@ export function getPredictions() {
 
 export function getAnomalies() {
   return request('/api/analytics/anomalies');
+}
+
+// Admin
+export function listUsers() {
+  return request('/api/admin/users');
+}
+
+export function createUser(email, password, name, role) {
+  return request('/api/admin/users', {
+    method: 'POST',
+    body: JSON.stringify({ email, password, name, role }),
+  });
+}
+
+export function updateUser(userId, name, role) {
+  return request(`/api/admin/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ name, role }),
+  });
+}
+
+export function deactivateUser(userId) {
+  return request(`/api/admin/users/${userId}/deactivate`, {
+    method: 'POST',
+  });
+}
+
+export function activateUser(userId) {
+  return request(`/api/admin/users/${userId}/activate`, {
+    method: 'POST',
+  });
+}
+
+// Document file preview
+export function getDocumentFileUrl(documentId) {
+  const token = getToken();
+  const base = API_URL || '';
+  return `${base}/api/documents/${documentId}/file?token=${encodeURIComponent(token || '')}`;
 }

@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
+from src.backend.api.routes_admin import router as admin_router
 from src.backend.api.routes_analytics import router as analytics_router
 from src.backend.api.routes_auth import router as auth_router
 from src.backend.api.routes_pipeline import router as pipeline_router
@@ -15,6 +17,12 @@ app = FastAPI(title="IDP Platform", version="0.1.0")
 @app.on_event("startup")
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        conn.execute(text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+            "is_active BOOLEAN NOT NULL DEFAULT true"
+        ))
+        conn.commit()
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,6 +38,7 @@ app.include_router(upload_router)
 app.include_router(validation_router)
 app.include_router(pipeline_router)
 app.include_router(analytics_router)
+app.include_router(admin_router)
 
 
 @app.get("/health")

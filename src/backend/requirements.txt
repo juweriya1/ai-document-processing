@@ -19,3 +19,14 @@ statsmodels==0.14.1
 easyocr==1.7.1
 pdfplumber==0.11.0
 spacy==3.7.2
+# Phase 7A: GOT-OCR 2.0 + Docling
+transformers>=4.45.0
+torch>=2.1.0
+torchvision
+docling>=2.0.0
+tiktoken
+# Phase 7B (QLoRA fine-tuning)
+bitsandbytes>=0.43.0
+peft>=0.11.0
+# Phase 7B (Qwen2-VL inference)
+qwen-vl-utils>=0.0.8

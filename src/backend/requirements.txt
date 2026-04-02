@@ -30,3 +30,5 @@ bitsandbytes>=0.43.0
 peft>=0.11.0
 # Phase 7B (Qwen2-VL inference)
 qwen-vl-utils>=0.0.8
+# Evaluation datasets (CORD + SROIE benchmarking)
+datasets>=2.18.0

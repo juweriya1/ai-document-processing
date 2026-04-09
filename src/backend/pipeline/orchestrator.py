@@ -62,7 +62,10 @@ class RealExtractor(ExtractorInterface):
 class PipelineOrchestrator:
     def __init__(self, db: Session, extractor: ExtractorInterface | None = None):
         self.db = db
-        self.extractor = extractor or RealExtractor()
+        if extractor is None:
+            from src.backend.pipeline.agentic_extractor import AgenticExtractor
+            extractor = AgenticExtractor(db=db)
+        self.extractor = extractor
 
     def process_document(self, document_id: str) -> dict:
         doc = get_document(self.db, document_id)

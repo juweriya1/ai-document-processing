@@ -1,28 +1,31 @@
-:root {
-  --color-primary: #14b8a6;
-  --color-primary-dark: #0d9488;
-  --color-success: #22c55e;
-  --color-error: #ef4444;
-  --color-warning: #f59e0b;
-  --color-bg: #f3f4f6;
-  --color-card: #ffffff;
-  --color-border: #e5e7eb;
-  --color-text: #1f2937;
-  --color-text-muted: #6b7280;
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  --radius: 8px;
-}
+/* App shell layout */
+.app { min-height: 100vh; }
 
-.app {
-  min-height: 100vh;
+.app__shell {
   display: flex;
-  flex-direction: column;
+  min-height: 100vh;
 }
 
-.app__content {
+.app__main {
   flex: 1;
-  padding: 24px;
-  max-width: 1200px;
-  width: 100%;
-  margin: 0 auto;
+  min-width: 0;
+  margin-left: var(--sidebar-w);
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+/* Login page has no sidebar */
+.app__main--full {
+  margin-left: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app__main {
+    margin-left: 0;
+    padding-bottom: 72px; /* space for mobile bottom nav */
+  }
+  .page-wrap {
+    padding: 24px 20px;
+  }
 }

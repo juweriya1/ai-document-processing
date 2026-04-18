@@ -1,201 +1,163 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import {
-  getDocumentFields,
-  validateDocument,
-  submitCorrection,
-} from '../api/client';
+import { getDocumentFields, validateDocument, submitCorrection } from '../api/client';
 import { useToast } from '../components/Toast';
 import './ValidationPage.css';
+
+function statusBadgeClass(s) {
+  return s === 'valid' ? 'badge--success' : s === 'invalid' ? 'badge--danger' : s === 'corrected' ? 'badge--info' : 'badge--default';
+}
+function confClass(c) { return c >= 0.85 ? 'high' : c >= 0.6 ? 'mid' : 'low'; }
 
 export default function ValidationPage() {
   const { documentId: paramId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const toast = useToast();
+  const { user }  = useAuth();
+  const toast     = useToast();
 
-  const [docId, setDocId] = useState(paramId || '');
-  const [fields, setFields] = useState([]);
+  const [docId, setDocId]     = useState(paramId || '');
+  const [fields, setFields]   = useState([]);
   const [loading, setLoading] = useState(false);
-  const [editingField, setEditingField] = useState(null);
-  const [editValue, setEditValue] = useState('');
-  const [validationResult, setValidationResult] = useState(null);
+  const [editingId, setEditId] = useState(null);
+  const [editVal, setEditVal] = useState('');
+  const [valResult, setValResult] = useState(null);
 
-  const isReviewerOrAdmin = user?.role === 'reviewer' || user?.role === 'admin';
+  const canEdit = user?.role === 'reviewer' || user?.role === 'admin';
 
-  useEffect(() => {
-    if (paramId) {
-      setDocId(paramId);
-      loadFields(paramId);
-    }
-  }, [paramId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (paramId) { setDocId(paramId); loadFields(paramId); } }, [paramId]); // eslint-disable-line
 
   const loadFields = async (id) => {
     setLoading(true);
-    try {
-      const data = await getDocumentFields(id);
-      setFields(data);
-    } catch (err) {
-      toast(err.message, 'error');
-    } finally {
-      setLoading(false);
-    }
+    try { const d = await getDocumentFields(id); setFields(d); }
+    catch (err) { toast(err.message, 'error'); }
+    finally { setLoading(false); }
   };
 
-  const handleLoad = () => {
-    if (!docId.trim()) {
-      toast('Please enter a document ID', 'error');
-      return;
-    }
-    loadFields(docId.trim());
-  };
+  const handleLoad = () => { if (!docId.trim()) { toast('Enter a document ID', 'error'); return; } loadFields(docId.trim()); };
 
   const handleValidate = async () => {
     if (!docId.trim()) return;
     try {
-      const data = await validateDocument(docId.trim());
-      setValidationResult(data.summary);
+      const d = await validateDocument(docId.trim());
+      setValResult(d.summary);
       await loadFields(docId.trim());
       toast('Validation complete', 'success');
-    } catch (err) {
-      toast(err.message, 'error');
-    }
+    } catch (err) { toast(err.message, 'error'); }
   };
 
-  const handleStartEdit = (field) => {
-    setEditingField(field.id);
-    setEditValue(field.fieldValue || '');
-  };
-
-  const handleCancelEdit = () => {
-    setEditingField(null);
-    setEditValue('');
-  };
-
-  const handleSubmitCorrection = async (fieldId) => {
+  const handleSaveEdit = async (fieldId) => {
     try {
-      await submitCorrection(docId.trim(), fieldId, editValue);
-      toast('Correction submitted', 'success');
-      setEditingField(null);
-      setEditValue('');
+      await submitCorrection(docId.trim(), fieldId, editVal);
+      toast('Correction saved', 'success');
+      setEditId(null); setEditVal('');
       await loadFields(docId.trim());
-    } catch (err) {
-      toast(err.message, 'error');
-    }
+    } catch (err) { toast(err.message, 'error'); }
   };
+
+  const counts = fields.reduce((acc, f) => { acc[f.status] = (acc[f.status] || 0) + 1; return acc; }, {});
+  const summaryItems = [
+    { key: 'valid',     label: 'Valid',     color: 'var(--success)' },
+    { key: 'invalid',   label: 'Invalid',   color: 'var(--danger)' },
+    { key: 'corrected', label: 'Corrected', color: 'var(--info)' },
+    { key: 'pending',   label: 'Pending',   color: 'var(--warning)' },
+  ];
 
   return (
-    <div>
-      <h1 className="validation__title">Data Validation</h1>
+    <div className="page-wrap">
+      <div className="page-hd">
+        <div>
+          <h1 className="page-title">Data Validation</h1>
+          <p className="page-subtitle">Review extracted fields and submit corrections</p>
+        </div>
+        {canEdit && fields.length > 0 && (
+          <button className="btn btn-primary" onClick={handleValidate}>Run Validation</button>
+        )}
+      </div>
 
+      {/* Doc ID input (only if not from URL param) */}
       {!paramId && (
-        <div className="validation__input-section">
-          <label className="validation__input-label">Document ID</label>
-          <div className="validation__input-row">
-            <input
-              type="text"
-              className="validation__input"
-              value={docId}
-              onChange={(e) => setDocId(e.target.value)}
-              placeholder="Enter document ID (UUID)"
-            />
-            <button className="validation__load-btn" onClick={handleLoad}>
-              Load Fields
-            </button>
+        <div className="field" style={{ marginBottom: 20 }}>
+          <label className="field-label">Document ID</label>
+          <div style={{ display:'flex', gap:10 }}>
+            <input className="field-input" type="text" value={docId}
+              onChange={e => setDocId(e.target.value)} placeholder="Enter document UUID…" />
+            <button className="btn btn-ghost" onClick={handleLoad}>Load Fields</button>
           </div>
         </div>
       )}
 
-      {loading && (
-        <div className="validation__loading">Loading fields...</div>
-      )}
-
-      {validationResult && (
-        <div className="validation__summary">
-          <span className="validation__summary-item validation__summary-item--valid">
-            Valid: {validationResult.valid}
-          </span>
-          <span className="validation__summary-item validation__summary-item--invalid">
-            Invalid: {validationResult.invalid}
-          </span>
-          <span className="validation__summary-item validation__summary-item--corrected">
-            Corrected: {validationResult.corrected}
-          </span>
-          <span className="validation__summary-item">
-            Pending: {validationResult.pending}
-          </span>
+      {/* Validation result summary */}
+      {(valResult || fields.length > 0) && (
+        <div className="val-summary">
+          {summaryItems.map(({ key, label, color }) => (
+            <div className="val-summary__item" key={key}>
+              <div className="val-summary__dot" style={{ background: color }} />
+              <span className="val-summary__label">{label}</span>
+              <span className="val-summary__count">{counts[key] || 0}</span>
+            </div>
+          ))}
         </div>
       )}
 
-      {fields.length > 0 && (
+      {/* Loading */}
+      {loading && (
+        <div className="val-loading"><span className="spinner" /> Loading extracted fields…</div>
+      )}
+
+      {/* Fields table */}
+      {!loading && fields.length > 0 && (
         <>
-          <div className="validation__table-wrap">
-            <table className="validation__table">
+          <div className="table-wrap">
+            <table className="table">
               <thead>
                 <tr>
                   <th>Field Name</th>
                   <th>Extracted Value</th>
                   <th>Confidence</th>
                   <th>Status</th>
-                  {isReviewerOrAdmin && <th>Actions</th>}
+                  {canEdit && <th>Actions</th>}
                 </tr>
               </thead>
               <tbody>
-                {fields.map((field) => (
-                  <tr
-                    key={field.id}
-                    className={field.status === 'invalid' ? 'validation__row--invalid' : ''}
-                  >
-                    <td>{field.fieldName}</td>
+                {fields.map(f => (
+                  <tr key={f.id} style={f.status === 'invalid' ? { background:'rgba(248,113,113,0.04)' } : {}}>
+                    <td style={{ fontWeight:600, color:'var(--text-1)' }}>{f.fieldName}</td>
                     <td>
-                      {editingField === field.id ? (
-                        <input
-                          type="text"
-                          className="validation__edit-input"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          autoFocus
-                        />
+                      {editingId === f.id ? (
+                        <input className="val-edit-input" value={editVal}
+                          onChange={e => setEditVal(e.target.value)} autoFocus
+                          onKeyDown={e => e.key === 'Enter' && handleSaveEdit(f.id)} />
                       ) : (
-                        field.fieldValue || '\u2014'
+                        <span className={f.status === 'corrected' ? '' : ''} style={f.status === 'corrected' ? { color:'var(--info)' } : {}}>
+                          {f.fieldValue || '—'}
+                        </span>
                       )}
                     </td>
                     <td>
-                      {field.confidence != null
-                        ? `${(field.confidence * 100).toFixed(1)}%`
-                        : '\u2014'}
+                      {f.confidence != null ? (
+                        <div className="conf-bar">
+                          <div className="conf-bar__track">
+                            <div className={`conf-bar__fill conf-bar__fill--${confClass(f.confidence)}`}
+                              style={{ width: `${(f.confidence*100).toFixed(0)}%` }} />
+                          </div>
+                          <span className="conf-bar__label">{(f.confidence*100).toFixed(1)}%</span>
+                        </div>
+                      ) : '—'}
                     </td>
-                    <td>
-                      <span className={`validation__status validation__status--${field.status}`}>
-                        {field.status}
-                      </span>
-                    </td>
-                    {isReviewerOrAdmin && (
+                    <td><span className={`badge ${statusBadgeClass(f.status)}`}>{f.status}</span></td>
+                    {canEdit && (
                       <td>
-                        {editingField === field.id ? (
-                          <>
-                            <button
-                              className="validation__action-btn"
-                              onClick={() => handleSubmitCorrection(field.id)}
-                            >
-                              Save
-                            </button>
-                            <button
-                              className="validation__action-btn"
-                              onClick={handleCancelEdit}
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            className="validation__action-btn"
-                            onClick={() => handleStartEdit(field)}
-                          >
-                            Edit
-                          </button>
-                        )}
+                        <div className="val-actions">
+                          {editingId === f.id ? (
+                            <>
+                              <button className="btn btn-success btn-sm" onClick={() => handleSaveEdit(f.id)}>Save</button>
+                              <button className="btn btn-ghost btn-sm" onClick={() => { setEditId(null); setEditVal(''); }}>Cancel</button>
+                            </>
+                          ) : (
+                            <button className="btn btn-ghost btn-sm" onClick={() => { setEditId(f.id); setEditVal(f.fieldValue || ''); }}>Edit</button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
@@ -203,29 +165,19 @@ export default function ValidationPage() {
               </tbody>
             </table>
           </div>
-
-          <div className="validation__footer">
-            {isReviewerOrAdmin && (
-              <button
-                className="validation__footer-btn validation__footer-btn--proceed"
-                onClick={handleValidate}
-              >
-                Run Validation
-              </button>
-            )}
-            <button
-              className="validation__footer-btn validation__footer-btn--proceed"
-              onClick={() => navigate(`/review/${docId.trim()}`)}
-            >
-              Proceed to Review
+          <div className="val-footer">
+            <button className="btn btn-primary" onClick={() => navigate(`/review/${docId.trim()}`)}>
+              Proceed to Review →
             </button>
           </div>
         </>
       )}
 
       {!loading && fields.length === 0 && docId && paramId && (
-        <div className="validation__empty">
+        <div className="empty-state" style={{ marginTop: 40 }}>
+          <span style={{ fontSize: 32 }}>📋</span>
           No extracted fields found. Process the document first.
+          <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/processing/${docId}`)}>Go to Processing</button>
         </div>
       )}
     </div>

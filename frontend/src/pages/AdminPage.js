@@ -1,251 +1,202 @@
 import { useState, useEffect } from 'react';
-import {
-  refreshSuppliers,
-  listUsers,
-  createUser,
-  updateUser,
-  deactivateUser,
-  activateUser,
-} from '../api/client';
+import { refreshSuppliers, listUsers, createUser, updateUser, deactivateUser, activateUser } from '../api/client';
 import { useToast } from '../components/Toast';
 import './AdminPage.css';
 
+const ROLES = ['admin', 'reviewer', 'enterprise_user'];
+
+function RolePill({ role }) {
+  return <span className={`role-pill role-pill--${role}`}>{role.replace(/_/g, ' ')}</span>;
+}
+
 export default function AdminPage() {
   const toast = useToast();
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshResult, setRefreshResult] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [loadingUsers, setLoadingUsers] = useState(true);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', password: '', name: '', role: 'enterprise_user' });
 
-  useEffect(() => {
-    loadUsers();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [refreshing, setRefreshing]   = useState(false);
+  const [refreshResult, setRefResult] = useState(null);
+
+  const [users, setUsers]             = useState([]);
+  const [loadingUsers, setLoadingU]   = useState(true);
+  const [showAdd, setShowAdd]         = useState(false);
+  const [newUser, setNewUser]         = useState({ email:'', password:'', name:'', role:'enterprise_user' });
+
+  useEffect(() => { loadUsers(); }, []); // eslint-disable-line
 
   const loadUsers = async () => {
-    setLoadingUsers(true);
-    try {
-      const data = await listUsers();
-      setUsers(data);
-    } catch (err) {
-      toast(err.message, 'error');
-    } finally {
-      setLoadingUsers(false);
-    }
+    setLoadingU(true);
+    try { setUsers(await listUsers()); }
+    catch (err) { toast(err.message, 'error'); }
+    finally { setLoadingU(false); }
   };
 
   const handleAddUser = async (e) => {
     e.preventDefault();
-    if (!newUser.email || !newUser.password || !newUser.name) {
-      toast('Please fill in all required fields', 'error');
-      return;
-    }
+    if (!newUser.email || !newUser.password || !newUser.name) { toast('All fields required', 'error'); return; }
     try {
       await createUser(newUser.email, newUser.password, newUser.name, newUser.role);
       toast('User created successfully', 'success');
-      setShowAddForm(false);
-      setNewUser({ email: '', password: '', name: '', role: 'enterprise_user' });
+      setShowAdd(false);
+      setNewUser({ email:'', password:'', name:'', role:'enterprise_user' });
       await loadUsers();
-    } catch (err) {
-      toast(err.message, 'error');
-    }
+    } catch (err) { toast(err.message, 'error'); }
   };
 
-  const handleToggleStatus = async (userId, currentlyActive) => {
+  const handleToggle = async (userId, active) => {
     try {
-      if (currentlyActive) {
-        await deactivateUser(userId);
-        toast('User deactivated', 'success');
-      } else {
-        await activateUser(userId);
-        toast('User activated', 'success');
-      }
+      active ? await deactivateUser(userId) : await activateUser(userId);
+      toast(active ? 'User deactivated' : 'User activated', 'success');
       await loadUsers();
-    } catch (err) {
-      toast(err.message, 'error');
-    }
+    } catch (err) { toast(err.message, 'error'); }
   };
 
   const handleEditRole = async (userId, currentRole) => {
-    const roles = ['admin', 'reviewer', 'enterprise_user'].filter(r => r !== currentRole);
-    const newRole = window.prompt(`Current role: ${currentRole}\nEnter new role (${roles.join(', ')}):`);
+    const others = ROLES.filter(r => r !== currentRole);
+    const newRole = window.prompt(`Current role: ${currentRole}\nNew role (${others.join(', ')}):`);
     if (!newRole) return;
-    if (!['admin', 'reviewer', 'enterprise_user'].includes(newRole)) {
-      toast('Invalid role', 'error');
-      return;
-    }
-    try {
-      await updateUser(userId, null, newRole);
-      toast('Role updated', 'success');
-      await loadUsers();
-    } catch (err) {
-      toast(err.message, 'error');
-    }
+    if (!ROLES.includes(newRole)) { toast('Invalid role', 'error'); return; }
+    try { await updateUser(userId, null, newRole); toast('Role updated', 'success'); await loadUsers(); }
+    catch (err) { toast(err.message, 'error'); }
   };
 
-  const handleRefreshSuppliers = async () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const data = await refreshSuppliers();
-      setRefreshResult(data);
-      toast(`Supplier metrics refreshed: ${data.suppliers_updated} supplier(s) updated`, 'success');
-    } catch (err) {
-      toast(err.message, 'error');
-    } finally {
-      setRefreshing(false);
-    }
+      const d = await refreshSuppliers();
+      setRefResult(d);
+      toast(`Refreshed — ${d.suppliers_updated} supplier(s) updated`, 'success');
+    } catch (err) { toast(err.message, 'error'); }
+    finally { setRefreshing(false); }
   };
 
-  return (
-    <div>
-      <h1 className="admin__title">Administration</h1>
+  const set = (k) => (e) => setNewUser(prev => ({ ...prev, [k]: e.target.value }));
 
-      <div className="admin__section">
-        <h2 className="admin__section-title">Supplier Analytics</h2>
-        <p className="admin__section-desc">
-          Recompute supplier metrics and risk scores from all processed documents.
-        </p>
-        <button
-          className="admin__add-btn"
-          onClick={handleRefreshSuppliers}
-          disabled={refreshing}
-        >
-          {refreshing ? 'Refreshing...' : 'Refresh Supplier Metrics'}
-        </button>
+  return (
+    <div className="page-wrap">
+      <div className="page-hd">
+        <h1 className="page-title">Administration</h1>
+      </div>
+
+      {/* ── Supplier analytics ── */}
+      <div className="admin-section">
+        <div className="admin-section-hd">
+          <div>
+            <div className="admin-section-title">Supplier Analytics</div>
+            <div className="admin-section-desc">Recompute supplier metrics and risk scores from all processed documents.</div>
+          </div>
+          <button className="btn btn-ghost" onClick={handleRefresh} disabled={refreshing}>
+            {refreshing ? <><span className="spinner" /> Refreshing…</> : '↻ Refresh Metrics'}
+          </button>
+        </div>
+
         {refreshResult && (
-          <div className="admin__refresh-result">
-            <div className="admin__refresh-stat">
-              Suppliers updated: <strong>{refreshResult.suppliers_updated}</strong>
-            </div>
-            <div className="admin__refresh-stat">
-              Risk scores computed: <strong>{refreshResult.risk_scores_computed}</strong>
-            </div>
+          <div className="refresh-result">
+            <div className="refresh-stat">Suppliers updated: <strong>{refreshResult.suppliers_updated}</strong></div>
+            <div className="refresh-stat">Risk scores computed: <strong>{refreshResult.risk_scores_computed}</strong></div>
             {refreshResult.suppliers?.length > 0 && (
-              <table className="admin__table" style={{ marginTop: 12 }}>
-                <thead>
-                  <tr>
-                    <th>Supplier</th>
-                    <th>Documents</th>
-                    <th>Avg Confidence</th>
-                    <th>Risk Score</th>
-                    <th>Method</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {refreshResult.suppliers.map((s) => (
-                    <tr key={s.supplier_name}>
-                      <td>{s.supplier_name}</td>
-                      <td>{s.total_documents}</td>
-                      <td>{s.avg_confidence ? `${(s.avg_confidence * 100).toFixed(1)}%` : 'N/A'}</td>
-                      <td>{s.risk_score}</td>
-                      <td>{s.method}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="table-wrap" style={{ marginTop: 14 }}>
+                <table className="table">
+                  <thead>
+                    <tr><th>Supplier</th><th>Documents</th><th>Avg Confidence</th><th>Risk Score</th><th>Method</th></tr>
+                  </thead>
+                  <tbody>
+                    {refreshResult.suppliers.map(s => (
+                      <tr key={s.supplier_name}>
+                        <td>{s.supplier_name}</td>
+                        <td>{s.total_documents}</td>
+                        <td>{s.avg_confidence ? `${(s.avg_confidence*100).toFixed(1)}%` : 'N/A'}</td>
+                        <td>{s.risk_score}</td>
+                        <td><span className="mono">{s.method}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
       </div>
 
-      <div className="admin__section">
-        <h2 className="admin__section-title">User Management</h2>
-
-        <div className="admin__actions">
-          <button className="admin__add-btn" onClick={() => setShowAddForm(!showAddForm)}>
-            {showAddForm ? 'Cancel' : 'Add User'}
+      {/* ── User management ── */}
+      <div className="admin-section">
+        <div className="admin-section-hd">
+          <div>
+            <div className="admin-section-title">User Management</div>
+            <div className="admin-section-desc">Manage platform accounts, roles, and access.</div>
+          </div>
+          <button className="btn btn-primary" onClick={() => setShowAdd(v => !v)}>
+            {showAdd ? 'Cancel' : '+ Add User'}
           </button>
         </div>
 
-        {showAddForm && (
-          <form className="admin__add-form" onSubmit={handleAddUser}>
-            <input
-              type="text"
-              placeholder="Name"
-              value={newUser.name}
-              onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-              required
-            />
-            <input
-              type="email"
-              placeholder="Email"
-              value={newUser.email}
-              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-              required
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={newUser.password}
-              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-              required
-            />
-            <select
-              value={newUser.role}
-              onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-            >
-              <option value="enterprise_user">Enterprise User</option>
-              <option value="reviewer">Reviewer</option>
-              <option value="admin">Admin</option>
-            </select>
-            <button type="submit" className="admin__add-btn">Create</button>
+        {/* Add user form */}
+        {showAdd && (
+          <form className="add-user-form" onSubmit={handleAddUser}>
+            <div className="field">
+              <label className="field-label">Full Name</label>
+              <input className="field-input" type="text" placeholder="Jane Smith" value={newUser.name} onChange={set('name')} required />
+            </div>
+            <div className="field">
+              <label className="field-label">Email</label>
+              <input className="field-input" type="email" placeholder="jane@company.com" value={newUser.email} onChange={set('email')} required />
+            </div>
+            <div className="field">
+              <label className="field-label">Password</label>
+              <input className="field-input" type="password" placeholder="••••••••" value={newUser.password} onChange={set('password')} required />
+            </div>
+            <div className="field">
+              <label className="field-label">Role</label>
+              <select className="field-input" value={newUser.role} onChange={set('role')}>
+                <option value="enterprise_user">Enterprise User</option>
+                <option value="reviewer">Reviewer</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div className="add-user-form__footer">
+              <button type="submit" className="btn btn-primary">Create User</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
+            </div>
           </form>
         )}
 
-        <div className="admin__table-wrap">
-          {loadingUsers ? (
-            <div className="admin__loading">Loading users...</div>
-          ) : (
-            <table className="admin__table">
+        {/* Users table */}
+        {loadingUsers ? (
+          <div className="val-loading"><span className="spinner" /> Loading users…</div>
+        ) : (
+          <div className="table-wrap">
+            <table className="table">
               <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
+                <tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr>
               </thead>
               <tbody>
-                {users.map((u) => (
+                {users.length === 0 ? (
+                  <tr><td colSpan={5} style={{ textAlign:'center', padding:'28px', color:'var(--text-3)' }}>No users found</td></tr>
+                ) : users.map(u => (
                   <tr key={u.id}>
-                    <td>{u.name}</td>
+                    <td style={{ fontWeight:600, color:'var(--text-1)' }}>{u.name}</td>
                     <td>{u.email}</td>
+                    <td><RolePill role={u.role} /></td>
                     <td>
-                      <span className={`admin__role-pill admin__role-pill--${u.role}`}>
-                        {u.role.replace('_', ' ')}
+                      <span className={u.is_active ? 'status-active' : 'status-inactive'}>
+                        {u.is_active ? '● Active' : '○ Inactive'}
                       </span>
                     </td>
                     <td>
-                      <span className={u.is_active ? 'admin__status-active' : 'admin__status-inactive'}>
-                        {u.is_active ? 'active' : 'inactive'}
-                      </span>
-                    </td>
-                    <td>
-                      <button className="admin__action-btn" onClick={() => handleEditRole(u.id, u.role)}>
-                        Edit Role
-                      </button>
-                      <button
-                        className={`admin__action-btn ${u.is_active ? 'admin__action-btn--danger' : ''}`}
-                        onClick={() => handleToggleStatus(u.id, u.is_active)}
-                      >
-                        {u.is_active ? 'Deactivate' : 'Activate'}
-                      </button>
+                      <div className="tbl-actions">
+                        <button className="btn btn-ghost btn-sm" onClick={() => handleEditRole(u.id, u.role)}>Edit Role</button>
+                        <button
+                          className={`btn btn-sm ${u.is_active ? 'btn-danger' : 'btn-success'}`}
+                          onClick={() => handleToggle(u.id, u.is_active)}
+                        >
+                          {u.is_active ? 'Deactivate' : 'Activate'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
-                {users.length === 0 && (
-                  <tr>
-                    <td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>
-                      No users found
-                    </td>
-                  </tr>
-                )}
               </tbody>
             </table>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

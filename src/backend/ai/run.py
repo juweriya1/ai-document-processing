@@ -6,8 +6,12 @@ from backend.ai.ocr import run_ocr
 from backend.ai.extract import extract_fields
 
 
-SAMPLES_DIR = Path("src/backend/ai/data/samples")
-OUTPUT_FILE = Path("src/backend/ai/outputs/tesseract_v0.jsonl")
+DATASETS = [
+    "src/backend/ai/data/local_receipts",
+    "src/backend/ai/data/sroie_receipts",
+]
+
+OUTPUT_FILE = Path("src/backend/ai/outputs/tesseract_eval_v0.jsonl")
 
 
 def process_document(file_path: str):
@@ -33,20 +37,22 @@ def save_result(result: dict):
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def run_single():
-    # today: only one file exists, so this is safe
-    files = list(SAMPLES_DIR.glob("*"))
+def run_dataset(dataset_path: str):
+    folder = Path(dataset_path)
+    files = list(folder.glob("*"))
 
     if not files:
-        raise ValueError("No sample files found")
+        raise ValueError(f"No files found in {dataset_path}")
 
-    file_path = str(files[0])
+    print(f"\nRunning Tesseract eval on: {dataset_path}")
+    print(f"Files: {len(files)}")
 
-    result = process_document(file_path)
-
-    print(result)
-    save_result(result)
+    for file_path in files:
+        result = process_document(str(file_path))
+        print(result["file"])
+        save_result(result)
 
 
 if __name__ == "__main__":
-    run_single()
+    for dataset in DATASETS:
+        run_dataset(dataset)

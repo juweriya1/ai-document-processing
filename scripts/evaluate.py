@@ -103,9 +103,9 @@ def load_sroie_test_set() -> list[dict[str, Any]]:
     logger.info("Loading SROIE test split …")
     # The SROIE dataset on HuggingFace uses the 'darentang/sroie' configuration
     try:
-        dataset = load_dataset("darentang/sroie", "original", split="test")
+        dataset = load_dataset("darentang/sroie", "original", split="test", trust_remote_code=True)
     except Exception:
-        dataset = load_dataset("sroie", split="test")
+        dataset = load_dataset("darentang/sroie", split="test", trust_remote_code=True)
 
     samples = []
     for row in dataset:

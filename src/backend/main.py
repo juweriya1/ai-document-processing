@@ -11,6 +11,10 @@ from src.backend.api.routes_validation import router as validation_router
 from src.backend.db.database import engine
 from src.backend.db.models import Base
 
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 app = FastAPI(title="IDP Platform", version="0.1.0")
 
 

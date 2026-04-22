@@ -36,38 +36,85 @@ class MockExtractor(ExtractorInterface):
         return fields, line_items
 
 
+# class RealExtractor(ExtractorInterface):
+#     def __init__(self):
+#         from src.backend.ingestion.preprocessing import Preprocessing
+#         from src.backend.ocr.ocr_engine import OCREngine
+#         from src.backend.extraction.entity_extractor import EntityExtractor
+
+#         self._preprocessing = Preprocessing()
+#         self._ocr_engine = OCREngine(use_got_ocr=False)
+#         self._entity_extractor = EntityExtractor()
+
+#     def extract(self, document_id: str, filename: str):
+
+#         pdf_path = os.path.join("uploads", filename)
+
+#         logger.info("DB filename: %s", filename)
+#         logger.info("Resolved path: %s", pdf_path)
+#         logger.info("FILE EXISTS: %s", os.path.exists(pdf_path))
+
+#         try:
+#             pages = self._preprocessing.preprocess_document(pdf_path)
+#             logger.info("PAGES: %s", len(pages))
+
+#             ocr_result = self._ocr_engine.process_document(pages, pdf_path=pdf_path)
+
+#             ocr_text = (ocr_result.full_text or "").strip()
+
+#             if not ocr_text and not any(p.text.strip() for p in ocr_result.pages if p.text):
+#                 logger.error("OCR returned empty text for %s", document_id)
+#                 return [], []
+                
+#             logger.info("OCR TEXT SAMPLE: %s", ocr_text[:300])
+
+#             extracted = self._entity_extractor.extract(ocr_result)
+
+#             logger.info("OCR RESULT OBJECT: %s", ocr_result)
+
+#             return extracted.fields, extracted.line_items
+
+#         except Exception as e: # temporary!!
+#             logger.exception("RealExtractor failed for document %s", document_id)
+#             raise RuntimeError(f"Extraction failed: {str(e)}")
+
+
 class RealExtractor(ExtractorInterface):
-    def __init__(self):
-        from src.backend.ingestion.preprocessing import Preprocessing
-        from src.backend.ocr.ocr_engine import OCREngine
-        from src.backend.extraction.entity_extractor import EntityExtractor
-
-        self._preprocessing = Preprocessing()
-        self._ocr_engine = OCREngine()
-        self._entity_extractor = EntityExtractor()
-
     def extract(self, document_id: str, filename: str) -> tuple[list[dict], list[dict]]:
-        pdf_path = os.path.join("uploads", filename)
+        from src.backend.ai.run import process_document
 
-        try:
-            pages = self._preprocessing.preprocess_document(pdf_path)
-            ocr_result = self._ocr_engine.process_document(pages, pdf_path=pdf_path)
-            extracted = self._entity_extractor.extract(ocr_result)
-            return extracted.fields, extracted.line_items
-        except Exception as e:
-            logger.error("RealExtractor failed for document %s: %s", document_id, e)
-            return [], []
+        file_path = os.path.join("uploads", filename)
 
+        logger.warning("USING TESSERACT PIPELINE (NO OCR / NO VLM)")
 
+        result = process_document(file_path)
+
+        fields = result.get("fields", {})
+        raw_fields = []
+
+        for k, v in fields.items():
+            if v is not None:
+                raw_fields.append({
+                    "field_name": k,
+                    "field_value": str(v),
+                    "confidence": 1.0
+                })
+
+        line_items = []  # keep empty for now unless your regex produces them
+
+        return raw_fields, line_items
 class PipelineOrchestrator:
     def __init__(self, db: Session, extractor: ExtractorInterface | None = None):
         self.db = db
-        if extractor is None:
-            from src.backend.pipeline.agentic_extractor import AgenticExtractor
-            extractor = AgenticExtractor(db=db)
-        self.extractor = extractor
+
+        if extractor is not None:
+            self.extractor = extractor
+        else:
+            from src.backend.pipeline.real_extractor import RealExtractor  # or inline class
+            self.extractor = RealExtractor()
 
     def process_document(self, document_id: str) -> dict:
+        logger.warning("PIPELINE HIT")
         doc = get_document(self.db, document_id)
         if doc is None:
             raise ValueError(f"Document {document_id} not found")
@@ -90,7 +137,7 @@ class PipelineOrchestrator:
         validation_results = validate_document_fields(self.db, document_id)
 
         has_invalid = any(r["status"] == "invalid" for r in validation_results)
-        final_status = "review_pending" if has_invalid else "review_pending"
+        final_status = "review_pending" if has_invalid else "processed"
 
         update_document_status(self.db, document_id, final_status)
 

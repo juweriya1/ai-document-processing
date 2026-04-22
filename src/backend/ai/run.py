@@ -37,22 +37,20 @@ def save_result(result: dict):
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def run_dataset(dataset_path: str):
-    folder = Path(dataset_path)
-    files = list(folder.glob("*"))
+def run_single():
+    # today: only one file exists, so this is safe
+    files = list(SAMPLES_DIR.glob("*"))
 
     if not files:
-        raise ValueError(f"No files found in {dataset_path}")
+        raise ValueError("No sample files found")
 
-    print(f"\nRunning Tesseract eval on: {dataset_path}")
-    print(f"Files: {len(files)}")
+    file_path = str(files[0])
 
-    for file_path in files:
-        result = process_document(str(file_path))
-        print(result["file"])
-        save_result(result)
+    result = process_document(file_path)
+
+    print(result)
+    save_result(result)
 
 
 if __name__ == "__main__":
-    for dataset in DATASETS:
-        run_dataset(dataset)
+    run_single()

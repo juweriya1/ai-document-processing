@@ -1,7 +1,7 @@
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./idp_platform.db")
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite:///./idp_platform_test.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://localhost:5433/idp_platform")
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql://localhost:5433/idp_platform_test")
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-not-for-production")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))

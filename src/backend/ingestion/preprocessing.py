@@ -3,6 +3,9 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 from pdf2image import convert_from_path
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -46,13 +49,38 @@ class Preprocessing:
     def preprocess_document(self, pdf_path: str) -> list[PreprocessedPage]:
         images = self.convert_pdf_to_images(pdf_path)
         pages = []
+
         for i, img in enumerate(images):
+
+            logger.info("RAW PAGE %s SHAPE: %s", i + 1, img.shape)
+            logger.info("RAW PAGE %s MIN/MAX: %s / %s", i + 1, img.min(), img.max())
+
             gray = self.to_grayscale(img)
+            logger.info("GRAY PAGE %s SHAPE: %s", i + 1, gray.shape)
+
             denoised = self.denoise_image(gray)
+            logger.info("DENOISED PAGE %s SHAPE: %s", i + 1, denoised.shape)
+
             deskewed = self.deskew_image(denoised)
-            pages.append(PreprocessedPage(
-                page_number=i + 1,
-                original=img,
-                processed=deskewed,
-            ))
+            cv2.imwrite(f"/tmp/preprocessed_page_{i+1}.png", deskewed)
+            logger.info("FINAL PAGE %s SHAPE: %s", i + 1, deskewed.shape)
+
+            logger.info("FINAL PAGE %s MIN/MAX: %s / %s", i + 1, deskewed.min(), deskewed.max())
+
+            pages.append(
+                PreprocessedPage(
+                    page_number=i + 1,
+                    original=img,
+                    processed=deskewed,
+                )
+            )
+
+        logger.info("PREPROCESS DONE: %s pages", len(pages))
+        logger.info("PREPROCESS SAMPLE SHAPE: %s", pages[0].processed.shape)
+        logger.info(
+            "PREPROCESS SAMPLE TYPE: %s MIN/MAX: %s %s",
+            pages[0].processed.dtype,
+            pages[0].processed.min(),
+            pages[0].processed.max()
+        )
         return pages

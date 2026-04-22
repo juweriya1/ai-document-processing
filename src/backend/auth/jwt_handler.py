@@ -32,5 +32,14 @@ def verify_token(token: str) -> dict:
         ) from e
 
 
+# def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+#     return verify_token(token)
+
 def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
-    return verify_token(token)
+    payload = verify_token(token)
+
+    return {
+        "user_id": payload.get("user_id"),
+        "email": payload.get("sub"),
+        "role": payload.get("role"),
+    }

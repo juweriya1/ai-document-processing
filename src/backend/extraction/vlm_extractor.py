@@ -307,13 +307,17 @@ class VLMExtractor(ExtractorInterface):
         pdf_path = os.path.join("uploads", filename)
         try:
             pages = self._preprocessing.preprocess_document(pdf_path)
-            ocr_result = OCREngine().process_document(pages, pdf_path=pdf_path)
+            ocr_result = OCREngine(use_got_ocr=False).process_document(pages, pdf_path=pdf_path)
+
+            logger.info("OCR FULL TEXT LENGTH: %s", len(ocr_result.full_text))
+            logger.info("OCR FULL TEXT PREVIEW: %s", ocr_result.full_text[:200])
 
             # Use first page for VLM; iterate remaining pages for better coverage
             all_fields: list[dict] = []
             all_line_items: list[dict] = []
 
             for page in pages:
+                logger.info("RUNNING VLM ON PAGE: %s", page.page_number)
                 pil_image = self._page_to_pil(page.processed)
                 raw, confidence = self._run_inference(pil_image)
                 extracted = self._parse_response(

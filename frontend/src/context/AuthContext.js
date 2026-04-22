@@ -13,6 +13,9 @@ const initialState = {
 function authReducer(state, action) {
   switch (action.type) {
     case 'LOGIN_SUCCESS':
+      localStorage.setItem('idp_token', action.payload.token);
+      localStorage.setItem('idp_user', JSON.stringify(action.payload.user));
+
       return {
         user: action.payload.user,
         token: action.payload.token,
@@ -57,11 +60,13 @@ export function AuthProvider({ children }) {
 
   const loginAction = useCallback(async (email, password) => {
     const data = await apiLogin(email, password);
-    localStorage.setItem('idp_token', data.accessToken);
+
+    localStorage.setItem('idp_token', data.access_token);
     localStorage.setItem('idp_user', JSON.stringify(data.user));
+
     dispatch({
       type: 'LOGIN_SUCCESS',
-      payload: { user: data.user, token: data.accessToken },
+      payload: { user: data.user, token: data.access_token },
     });
   }, []);
 

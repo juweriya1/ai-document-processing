@@ -6,8 +6,12 @@ from backend.ai.ocr import run_ocr
 from backend.ai.extract import extract_fields
 
 
-SAMPLES_DIR = Path("src/backend/ai/data/samples")
-OUTPUT_FILE = Path("src/backend/ai/outputs/tesseract_v0.jsonl")
+DATASETS = [
+    "src/backend/ai/data/local_receipts",
+    "src/backend/ai/data/sroie_receipts",
+]
+
+OUTPUT_FILE = Path("src/backend/ai/outputs/tesseract_eval_with_regex_extract.jsonl")
 
 
 def process_document(file_path: str):

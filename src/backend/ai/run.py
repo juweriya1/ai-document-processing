@@ -11,7 +11,7 @@ DATASETS = [
     "src/backend/ai/data/sroie_receipts",
 ]
 
-OUTPUT_FILE = Path("src/backend/ai/outputs/tesseract_eval_v0.jsonl")
+OUTPUT_FILE = Path("src/backend/ai/outputs/tesseract_eval_with_regex_extract.jsonl")
 
 
 def process_document(file_path: str):

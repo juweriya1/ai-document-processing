@@ -24,7 +24,10 @@ export default function LoginPage() {
       } else {
         await loginAction(email, password);
       }
-      navigate('/dashboard');
+      // navigate('/dashboard');
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 0);
     } catch (err) {
       setError(err.message);
     } finally {

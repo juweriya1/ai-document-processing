@@ -1,140 +1,173 @@
-.admin__title {
-  font-size: 22px;
-  font-weight: 700;
-  margin-bottom: 24px;
-}
+/* ═══ Admin Page ═══ */
 
-.admin__actions {
+/* Tabs */
+.admin__tabs {
   display: flex;
-  justify-content: flex-end;
-  margin-bottom: 16px;
+  gap: 2px;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 4px;
+  margin-bottom: var(--sp-8);
+  width: fit-content;
 }
 
-.admin__add-btn {
-  padding: 10px 20px;
-  background-color: var(--color-primary);
-  color: #fff;
+.admin__tab {
+  padding: 8px 20px;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--text-3);
+  cursor: pointer;
   border: none;
-  border-radius: var(--radius);
-  font-size: 14px;
-  font-weight: 600;
+  background: transparent;
+  transition: all var(--t-fast);
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
-.admin__add-btn:hover {
-  background-color: var(--color-primary-dark);
+.admin__tab:hover { color: var(--text-1); background: var(--bg-4); }
+
+.admin__tab--active {
+  background: var(--bg-5) !important;
+  color: var(--text-1) !important;
+  box-shadow: var(--shadow-sm);
 }
 
-.admin__table-wrap {
-  background: var(--color-card);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-}
-
-.admin__table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14px;
-}
-
-.admin__table th {
-  background: var(--color-bg);
-  padding: 12px 16px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.admin__table td {
-  padding: 12px 16px;
-  border-top: 1px solid var(--color-border);
-}
-
-.admin__role-pill {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.admin__role-pill--admin {
-  background: #ede9fe;
-  color: #7c3aed;
-}
-
-.admin__role-pill--reviewer {
-  background: #dbeafe;
-  color: #2563eb;
-}
-
-.admin__role-pill--enterprise_user {
-  background: var(--color-bg);
-  color: var(--color-text-muted);
-}
-
-.admin__status-active {
-  color: var(--color-success);
-  font-weight: 500;
-}
-
-.admin__status-inactive {
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
-.admin__action-btn {
-  padding: 6px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-card);
-  font-size: 12px;
-  font-weight: 500;
-  margin-right: 8px;
-  transition: border-color 0.15s;
-}
-
-.admin__action-btn:hover {
-  border-color: var(--color-primary);
-}
-
-.admin__action-btn--danger:hover {
-  border-color: var(--color-error);
-  color: var(--color-error);
-}
-
+/* Section cards */
 .admin__section {
-  margin-bottom: 32px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  margin-bottom: var(--sp-6);
+}
+
+.admin__section-header {
+  padding: var(--sp-5) var(--sp-6);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
 }
 
 .admin__section-title {
-  font-size: 17px;
-  font-weight: 600;
-  margin-bottom: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -0.3px;
 }
 
 .admin__section-desc {
   font-size: 13px;
-  color: var(--color-text-muted);
-  margin-bottom: 12px;
+  color: var(--text-4);
+  margin-top: 2px;
 }
 
-.admin__add-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.admin__section-body {
+  padding: var(--sp-6);
 }
 
+/* Add user form */
+.admin__add-form {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-4);
+  padding: var(--sp-5) var(--sp-6);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--border);
+  animation: slideDown var(--t-base) both;
+}
+
+@media (max-width: 700px) {
+  .admin__add-form { grid-template-columns: 1fr; }
+}
+
+.admin__add-form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--sp-3);
+}
+
+/* Role pills */
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 100px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-transform: capitalize;
+}
+
+.role-pill--admin         { background: var(--purple-dim); color: var(--purple); }
+.role-pill--reviewer      { background: var(--accent-dim); color: var(--accent); }
+.role-pill--enterprise_user { background: var(--bg-5); color: var(--text-3); }
+
+/* Status dot */
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 6px;
+}
+.status-dot--active   { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.status-dot--inactive { background: var(--text-5); }
+
+/* Refresh result */
 .admin__refresh-result {
-  margin-top: 16px;
-  padding: 16px;
-  background: var(--color-bg);
-  border-radius: var(--radius);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-5);
+  margin-top: var(--sp-5);
+  animation: scaleIn var(--t-base) both;
+}
+
+.admin__refresh-stats {
+  display: flex;
+  gap: var(--sp-6);
+  margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
 }
 
 .admin__refresh-stat {
-  font-size: 14px;
-  margin-bottom: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
+
+.admin__refresh-stat strong {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -1px;
+}
+
+.admin__refresh-stat span {
+  font-size: 11px;
+  color: var(--text-4);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 600;
+}
+
+/* Inline role edit */
+.admin__role-select {
+  background: var(--bg-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  color: var(--text-1);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+}
+
+.admin__role-select option { background: var(--bg-3); }

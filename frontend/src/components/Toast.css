@@ -1,43 +1,71 @@
 .toast-container {
   position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 1000;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  pointer-events: none;
 }
 
 .toast {
-  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 300px;
+  max-width: 420px;
+  padding: 12px 14px;
   border-radius: var(--radius);
-  color: #fff;
-  font-size: 14px;
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  font-size: 13.5px;
   font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  animation: toast-slide-in 0.3s ease;
-  max-width: 360px;
+  color: var(--text-2);
+  pointer-events: all;
+  opacity: 0;
+  transform: translateX(20px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  backdrop-filter: blur(12px);
 }
 
-.toast--success {
-  background-color: var(--color-success);
+.toast--visible {
+  opacity: 1;
+  transform: translateX(0);
 }
 
-.toast--error {
-  background-color: var(--color-error);
+.toast--success { border-left: 3px solid var(--success); }
+.toast--success .toast__icon { color: var(--success); }
+
+.toast--error { border-left: 3px solid var(--error); }
+.toast--error .toast__icon { color: var(--error); }
+
+.toast--warning { border-left: 3px solid var(--warning); }
+.toast--warning .toast__icon { color: var(--warning); }
+
+.toast--info { border-left: 3px solid var(--accent); }
+.toast--info .toast__icon { color: var(--accent); }
+
+.toast__icon {
+  flex-shrink: 0;
+  display: flex;
 }
 
-.toast--info {
-  background-color: var(--color-primary);
+.toast__message {
+  flex: 1;
+  line-height: 1.4;
 }
 
-@keyframes toast-slide-in {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+.toast__close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-4);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  transition: color var(--t-fast);
 }
+
+.toast__close:hover { color: var(--text-2); }

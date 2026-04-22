@@ -1,69 +1,45 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  getDocumentFields,
-  getDocumentCorrections,
-  approveDocument,
-  rejectDocument,
-  getDocumentStatus,
-  getDocumentFileUrl,
+  getDocumentFields, getDocumentCorrections,
+  approveDocument, rejectDocument,
+  getDocumentStatus, getDocumentFileUrl,
 } from '../api/client';
 import { useToast } from '../components/Toast';
 import './ReviewPage.css';
 
 export default function ReviewPage() {
   const { documentId: paramId } = useParams();
-  const navigate = useNavigate(); // eslint-disable-line no-unused-vars
-  const { user } = useAuth();
-  const toast = useToast();
+  const { user }                = useAuth();
+  const toast                   = useToast();
 
-  const [docId, setDocId] = useState(paramId || '');
-  const [fields, setFields] = useState([]);
-  const [corrections, setCorrections] = useState([]);
-  const [docStatus, setDocStatus] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [docId, setDocId]               = useState(paramId || '');
+  const [fields, setFields]             = useState([]);
+  const [corrections, setCorrections]   = useState([]);
+  const [docStatus, setDocStatus]       = useState(null);
+  const [loading, setLoading]           = useState(false);
   const [rejectReason, setRejectReason] = useState('');
-  const [showRejectInput, setShowRejectInput] = useState(false);
-  const [documentBlobUrl, setDocumentBlobUrl] = useState(null);
-  const blobUrlRef = useRef(null);
+  const [showReject, setShowReject]     = useState(false);
+  const [blobUrl, setBlobUrl]           = useState(null);
+  const blobRef                         = useRef(null);
 
-  const isReviewerOrAdmin = user?.role === 'reviewer' || user?.role === 'admin';
-
-  useEffect(() => {
-    if (paramId) {
-      setDocId(paramId);
-      loadData(paramId);
-    }
-  }, [paramId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const canReview = user?.role === 'reviewer' || user?.role === 'admin';
 
   useEffect(() => {
-    return () => {
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-      }
-    };
-  }, []);
+    if (paramId) { setDocId(paramId); loadAll(paramId); }
+    return () => { if (blobRef.current) URL.revokeObjectURL(blobRef.current); };
+  }, [paramId]); // eslint-disable-line
 
-  const loadData = async (id) => {
+  const loadAll = async (id) => {
     setLoading(true);
     try {
-      const [fieldsData, statusData] = await Promise.all([
-        getDocumentFields(id),
-        getDocumentStatus(id),
-      ]);
-      setFields(fieldsData);
-      setDocStatus(statusData);
-
-      loadDocumentPreview(id);
-
-      if (isReviewerOrAdmin) {
-        try {
-          const corr = await getDocumentCorrections(id);
-          setCorrections(corr);
-        } catch {
-          setCorrections([]);
-        }
+      const [f, s] = await Promise.all([getDocumentFields(id), getDocumentStatus(id)]);
+      setFields(f);
+      setDocStatus(s);
+      loadPreview(id);
+      if (canReview) {
+        try { setCorrections(await getDocumentCorrections(id)); } catch { setCorrections([]); }
       }
     } catch (err) {
       toast(err.message, 'error');
@@ -72,207 +48,232 @@ export default function ReviewPage() {
     }
   };
 
-  const loadDocumentPreview = async (id) => {
+  const loadPreview = async (id) => {
     try {
-      const fileUrl = getDocumentFileUrl(id);
+      const url   = getDocumentFileUrl(id);
       const token = localStorage.getItem('idp_token');
-      const response = await fetch(fileUrl, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      });
-      if (!response.ok) return;
-      const blob = await response.blob();
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-      }
-      const blobUrl = URL.createObjectURL(blob);
-      blobUrlRef.current = blobUrl;
-      setDocumentBlobUrl(blobUrl);
-    } catch {
-      // Preview not available
-    }
+      const res   = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      if (blobRef.current) URL.revokeObjectURL(blobRef.current);
+      const created  = URL.createObjectURL(blob);
+      blobRef.current = created;
+      setBlobUrl(created);
+    } catch {}
   };
 
   const handleLoad = () => {
-    if (!docId.trim()) {
-      toast('Please enter a document ID', 'error');
-      return;
-    }
-    loadData(docId.trim());
+    if (!docId.trim()) { toast('Please enter a document ID', 'error'); return; }
+    loadAll(docId.trim());
   };
 
   const handleApprove = async () => {
     try {
       await approveDocument(docId.trim());
       toast('Document approved', 'success');
-      await loadData(docId.trim());
+      await loadAll(docId.trim());
     } catch (err) {
       toast(err.message, 'error');
     }
   };
 
   const handleReject = async () => {
-    if (!rejectReason.trim()) {
-      toast('Please provide a rejection reason', 'error');
-      return;
-    }
+    if (!rejectReason.trim()) { toast('Please provide a rejection reason', 'error'); return; }
     try {
       await rejectDocument(docId.trim(), rejectReason.trim());
       toast('Document rejected', 'success');
-      setShowRejectInput(false);
+      setShowReject(false);
       setRejectReason('');
-      await loadData(docId.trim());
+      await loadAll(docId.trim());
     } catch (err) {
       toast(err.message, 'error');
     }
   };
 
-  const isTerminal = docStatus?.status === 'approved' || docStatus?.status === 'rejected';
-
-  const isPdf = docStatus?.filename?.toLowerCase().endsWith('.pdf');
+  const status     = docStatus?.status || '';
+  const isTerminal = status === 'approved' || status === 'rejected';
+  const isPdf      = docStatus?.filename?.toLowerCase().endsWith('.pdf');
 
   return (
-    <div>
-      <h1 className="review__title">Human-in-the-Loop Review</h1>
+    <div className="page-wrap">
+      <div className="page-header">
+        <h1 className="page-title">Human-in-the-Loop Review</h1>
+        <p className="page-subtitle">Verify extracted data and approve or reject documents</p>
+      </div>
 
+      {/* Manual load input */}
       {!paramId && (
-        <div className="review__input-section">
-          <label className="review__input-label">Document ID</label>
-          <div className="review__input-row">
+        <div style={{ display: 'flex', gap: 'var(--sp-3)', marginBottom: 'var(--sp-6)', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1 }}>
+            <label className="form-label">Document ID</label>
             <input
-              type="text"
-              className="review__input"
+              className="form-input"
               value={docId}
               onChange={(e) => setDocId(e.target.value)}
-              placeholder="Enter document ID (UUID)"
+              placeholder="Enter document UUID…"
             />
-            <button className="review__load-btn" onClick={handleLoad}>
-              Load Review
-            </button>
           </div>
+          <button className="btn btn--primary" onClick={handleLoad}>Load</button>
         </div>
       )}
 
+      {/* Loading */}
       {loading && (
-        <div className="review__loading">Loading review data...</div>
-      )}
-
-      {docStatus && (
-        <div className={`review__status-banner review__status-banner--${docStatus.status}`}>
-          Document: {docStatus.filename || docStatus.document_id} &mdash; Status:{' '}
-          <strong>{docStatus.status}</strong>
+        <div style={{ display: 'flex', gap: 'var(--sp-3)', padding: 'var(--sp-8)', justifyContent: 'center', color: 'var(--text-4)' }}>
+          <div className="spinner" /> Loading review data…
         </div>
       )}
 
+      {/* Status banner */}
+      {docStatus && (
+        <div className={`review__status-banner review__status-banner--${status}`}>
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+            <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M10 6v5M10 14v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <span>
+            <strong>{docStatus.filename || docStatus.document_id}</strong>
+            {' · '}Status: <strong>{status.replace(/_/g,' ')}</strong>
+            {docStatus.uploaded_at && ` · Uploaded ${new Date(docStatus.uploaded_at).toLocaleString()}`}
+          </span>
+        </div>
+      )}
+
+      {/* Split panel: preview + fields */}
       {fields.length > 0 && (
         <div className="review__split">
+          {/* Document preview */}
           <div className="review__panel">
-            <div className="review__panel-title">Document Preview</div>
-            <div className="review__preview">
-              {documentBlobUrl ? (
-                isPdf ? (
-                  <iframe
-                    src={documentBlobUrl}
-                    title="Document Preview"
-                    style={{ width: '100%', height: '600px', border: 'none' }}
-                  />
-                ) : (
-                  <img
-                    src={documentBlobUrl}
-                    alt="Document Preview"
-                    style={{ maxWidth: '100%', height: 'auto' }}
-                  />
-                )
-              ) : (
-                <span>Document preview not available</span>
+            <div className="review__panel-header">
+              <span className="review__panel-title">Document Preview</span>
+              {blobUrl && (
+                <a href={blobUrl} download={docStatus?.filename} className="btn btn--ghost btn--sm">
+                  <svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M10 4v8M10 12l-3-3M10 12l3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 15h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  Download
+                </a>
               )}
+            </div>
+            <div className="review__panel-body">
+              <div className="review__preview">
+                {blobUrl
+                  ? isPdf
+                    ? <iframe src={blobUrl} title="Document Preview" />
+                    : <img src={blobUrl} alt="Document Preview" />
+                  : (
+                    <div className="review__preview-placeholder">
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+                        <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M3 9h18" stroke="currentColor" strokeWidth="1.5"/>
+                      </svg>
+                      <span>Preview not available</span>
+                    </div>
+                  )
+                }
+              </div>
             </div>
           </div>
 
+          {/* Extracted fields */}
           <div className="review__panel">
-            <div className="review__panel-title">Extracted Fields</div>
-            <div className="review__fields">
-              <div className="review__field-row" style={{ fontWeight: 600, fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                <span>Field</span>
-                <span>Value</span>
-                <span>Status</span>
+            <div className="review__panel-header">
+              <span className="review__panel-title">Extracted Fields</span>
+              <span style={{ fontSize: 11, color: 'var(--text-4)' }}>{fields.length} fields</span>
+            </div>
+            <div className="review__panel-body">
+              <div className="review__fields-list">
+                {fields.map((f, idx) => (
+                  <div
+                    className="review__field-row animate-fade-in"
+                    key={f.id}
+                    style={{ animationDelay: `${idx * 20}ms` }}
+                  >
+                    <span className="review__field-name">{f.fieldName}</span>
+                    <span className={`review__field-value${f.status === 'corrected' ? ' review__field-value--corrected' : ''}`}>
+                      {f.fieldValue || '—'}
+                    </span>
+                    <span className={`vs-pill vs-pill--${f.status}`} style={{fontSize:10}}>
+                      {f.status}
+                    </span>
+                  </div>
+                ))}
               </div>
-              {fields.map((f) => (
-                <div className="review__field-row" key={f.id}>
-                  <span className="review__field-label">{f.fieldName}</span>
-                  <span className={f.status === 'corrected' ? 'review__field-corrected' : 'review__field-value'}>
-                    {f.fieldValue || '\u2014'}
-                  </span>
-                  <span className={`validation__status validation__status--${f.status}`}>
-                    {f.status}
-                  </span>
-                </div>
-              ))}
             </div>
           </div>
         </div>
       )}
 
-      {isReviewerOrAdmin && fields.length > 0 && !isTerminal && (
-        <div className="review__actions">
-          <button className="review__btn review__btn--approve" onClick={handleApprove}>
+      {/* Terminal state */}
+      {isTerminal && (
+        <div className={`review__final review__final--${status}`}>
+          <div className="review__final-icon">
+            {status === 'approved'
+              ? <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 12l5 5 9-9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              : <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+            }
+          </div>
+          <div className="review__final-title">
+            Document {status === 'approved' ? 'Approved' : 'Rejected'}
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text-4)', marginTop: 4 }}>
+            This document has been {status} and no further action is required
+          </div>
+        </div>
+      )}
+
+      {/* Review actions */}
+      {canReview && fields.length > 0 && !isTerminal && (
+        <div className="review__action-bar">
+          <div className="review__action-bar__label">
+            <strong style={{ color: 'var(--text-1)' }}>Ready to review?</strong>
+            <span> Approve if the extracted data looks correct, or reject with a reason.</span>
+          </div>
+          <button className="btn btn--success" onClick={handleApprove}>
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M4 10l4.5 4.5 7.5-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
             Approve
           </button>
-          {showRejectInput ? (
-            <div className="review__reject-form">
+          <button className="btn btn--danger" onClick={() => setShowReject(!showReject)}>
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M5 5l10 10M15 5L5 15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            Reject
+          </button>
+          {showReject && (
+            <div className="review__reject-row">
               <input
-                type="text"
-                className="review__reject-input"
-                placeholder="Reason for rejection"
+                className="form-input"
+                placeholder="Reason for rejection…"
                 value={rejectReason}
                 onChange={(e) => setRejectReason(e.target.value)}
                 autoFocus
               />
-              <button className="review__btn review__btn--reject" onClick={handleReject}>
-                Confirm Reject
-              </button>
-              <button
-                className="review__btn review__btn--cancel"
-                onClick={() => { setShowRejectInput(false); setRejectReason(''); }}
-              >
-                Cancel
-              </button>
+              <button className="btn btn--danger" onClick={handleReject}>Confirm Reject</button>
+              <button className="btn btn--ghost" onClick={() => { setShowReject(false); setRejectReason(''); }}>Cancel</button>
             </div>
-          ) : (
-            <button
-              className="review__btn review__btn--reject"
-              onClick={() => setShowRejectInput(true)}
-            >
-              Reject
-            </button>
           )}
         </div>
       )}
 
-      {isTerminal && (
-        <div className={`review__final-status review__final-status--${docStatus.status}`}>
-          This document has been <strong>{docStatus.status}</strong>.
+      {/* Empty state */}
+      {!loading && fields.length === 0 && docId && (
+        <div className="empty-state">
+          <svg className="empty-state__icon" viewBox="0 0 24 24" fill="none"><path d="M10 4C6 4 2.7 7.6 2 10c.7 2.4 4 6 8 6s7.3-3.6 8-6c-.7-2.4-4-6-8-6z" stroke="currentColor" strokeWidth="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/></svg>
+          <div className="empty-state__title">No review data available</div>
+          <div className="empty-state__desc">Process and validate the document before reviewing</div>
         </div>
       )}
 
+      {/* Corrections history */}
       {corrections.length > 0 && (
-        <div className="review__history">
-          <div className="review__history-title">Correction History</div>
+        <div className="review__history" style={{ marginTop: 'var(--sp-6)' }}>
+          <div className="review__history-header">Correction History</div>
           {corrections.map((c, i) => (
             <div className="review__history-item" key={i}>
               <span className="review__history-field">
-                {c.field_name}: &ldquo;{c.original_value}&rdquo; &rarr; &ldquo;{c.corrected_value}&rdquo;
+                {c.field_name}: "{c.original_value}" → "{c.corrected_value}"
               </span>
               <span className="review__history-time">
                 {c.corrected_at ? new Date(c.corrected_at).toLocaleString() : ''}
               </span>
             </div>
           ))}
-        </div>
-      )}
-
-      {!loading && fields.length === 0 && docId && paramId && (
-        <div className="review__empty">
-          No data available. Process and validate the document first.
         </div>
       )}
     </div>

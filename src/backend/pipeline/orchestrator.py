@@ -63,8 +63,7 @@ class PipelineOrchestrator:
     def __init__(self, db: Session, extractor: ExtractorInterface | None = None):
         self.db = db
         if extractor is None:
-            from src.backend.pipeline.agentic_extractor import AgenticExtractor
-            extractor = AgenticExtractor(db=db)
+            extractor = MockExtractor()
         self.extractor = extractor
 
     def process_document(self, document_id: str) -> dict:

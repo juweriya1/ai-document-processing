@@ -1,0 +1,140 @@
+.admin__title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+.admin__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.admin__add-btn {
+  padding: 10px 20px;
+  background-color: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.admin__add-btn:hover {
+  background-color: var(--color-primary-dark);
+}
+
+.admin__table-wrap {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.admin__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.admin__table th {
+  background: var(--color-bg);
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.admin__table td {
+  padding: 12px 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.admin__role-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin__role-pill--admin {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.admin__role-pill--reviewer {
+  background: #dbeafe;
+  color: #2563eb;
+}
+
+.admin__role-pill--enterprise_user {
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+}
+
+.admin__status-active {
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+.admin__status-inactive {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.admin__action-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-card);
+  font-size: 12px;
+  font-weight: 500;
+  margin-right: 8px;
+  transition: border-color 0.15s;
+}
+
+.admin__action-btn:hover {
+  border-color: var(--color-primary);
+}
+
+.admin__action-btn--danger:hover {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.admin__section {
+  margin-bottom: 32px;
+}
+
+.admin__section-title {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.admin__section-desc {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+}
+
+.admin__add-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.admin__refresh-result {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--color-bg);
+  border-radius: var(--radius);
+}
+
+.admin__refresh-stat {
+  font-size: 14px;
+  margin-bottom: 4px;
+}

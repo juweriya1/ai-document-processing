@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
+from sqlalchemy import inspect
 
 from src.backend.api.routes_admin import router as admin_router
 from src.backend.api.routes_analytics import router as analytics_router
@@ -17,12 +18,15 @@ app = FastAPI(title="IDP Platform", version="0.1.0")
 @app.on_event("startup")
 def create_tables():
     Base.metadata.create_all(bind=engine)
-    with engine.connect() as conn:
-        conn.execute(text(
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
-            "is_active BOOLEAN NOT NULL DEFAULT true"
-        ))
-        conn.commit()
+
+    inspector = inspect(engine)
+    columns = [col["name"] for col in inspector.get_columns("users")]
+
+    if "is_active" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
+        
+        
 
 app.add_middleware(
     CORSMiddleware,

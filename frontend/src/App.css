@@ -1,31 +1,51 @@
-/* App shell layout */
-.app { min-height: 100vh; }
-
-.app__shell {
+/* ═══ App Shell ═══ */
+.app-shell {
   display: flex;
   min-height: 100vh;
+  background: var(--bg-1);
 }
 
-.app__main {
+.app-shell__main {
   flex: 1;
   min-width: 0;
   margin-left: var(--sidebar-w);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Login layout override */
+.app-login {
   min-height: 100vh;
-  background: var(--bg);
+  background: var(--bg-0);
 }
 
-/* Login page has no sidebar */
-.app__main--full {
-  margin-left: 0;
+/* Global page transition */
+.page-wrap {
+  animation: slideUp 0.3s ease both;
 }
 
-/* Responsive */
+/* Loading screen */
+.app-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--bg-1);
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.app-loader__logo {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -0.5px;
+}
+
 @media (max-width: 768px) {
-  .app__main {
+  .app-shell__main {
     margin-left: 0;
-    padding-bottom: 72px; /* space for mobile bottom nav */
-  }
-  .page-wrap {
-    padding: 24px 20px;
+    margin-bottom: 60px;
   }
 }

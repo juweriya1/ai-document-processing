@@ -5,127 +5,240 @@ import { useToast } from '../components/Toast';
 import './ProcessingPage.css';
 
 const STEPS = [
-  { key: 'preprocessing',  name: 'Preprocessing',    desc: 'Image cleanup, deskew, noise removal' },
-  { key: 'extracting',     name: 'OCR & Extraction', desc: 'Text + field extraction via NER' },
-  { key: 'validating',     name: 'Validation',       desc: 'Schema validation on extracted fields' },
-  { key: 'review_pending', name: 'Awaiting Review',  desc: 'Queued for human-in-the-loop review' },
+  {
+    key: 'preprocessing',
+    name: 'Preprocessing',
+    desc: 'Image cleanup, deskewing, noise removal and quality enhancement',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+        <rect x="2" y="2" width="16" height="16" rx="3" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M6 10h8M10 6v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'extracting',
+    name: 'OCR & Field Extraction',
+    desc: 'Text extraction via OCR engine + entity recognition using VLM',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+        <path d="M5 3h7l4 4v10a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M7 9h6M7 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'validating',
+    name: 'Schema Validation',
+    desc: 'Structured field validation against document schema rules',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M6.5 10l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
+    key: 'review_pending',
+    name: 'Ready for Review',
+    desc: 'Processing complete — awaiting human-in-the-loop review',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="8" r="4" stroke="currentColor" strokeWidth="1.5"/>
+        <path d="M3 18c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    ),
+  },
 ];
-const ORDER = STEPS.map(s => s.key);
+
+const ORDER = ['preprocessing', 'extracting', 'validating', 'review_pending'];
 
 function stepStatus(key, current) {
   const ci = ORDER.indexOf(current);
-  const si = ORDER.indexOf(key);
+  const ki = ORDER.indexOf(key);
   if (ci < 0) return 'pending';
-  if (si < ci) return 'done';
-  if (si === ci) return 'active';
+  if (ki < ci) return 'done';
+  if (ki === ci) return 'active';
   return 'pending';
 }
 
-const DocIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8L14 2z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+const CheckIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
+    <path d="M4 10l4.5 4.5 7.5-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
-const CheckSm = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+
+const SpinnerSmall = () => (
+  <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
 );
 
 export default function ProcessingPage() {
   const { documentId: paramId } = useParams();
-  const navigate = useNavigate();
-  const toast    = useToast();
+  const navigate                = useNavigate();
+  const toast                   = useToast();
 
   const [docId, setDocId]         = useState(paramId || '');
   const [processing, setProcessing] = useState(false);
   const [docStatus, setDocStatus] = useState(null);
   const [error, setError]         = useState(null);
 
-  useEffect(() => { if (paramId) setDocId(paramId); }, [paramId]);
+  useEffect(() => {
+    if (paramId) {
+      setDocId(paramId);
+      // Auto-load status on arrival
+      getDocumentStatus(paramId)
+        .then(d => setDocStatus(d))
+        .catch(() => {});
+    }
+  }, [paramId]);
 
   const handleProcess = async () => {
     if (!docId.trim()) { toast('Please enter a document ID', 'error'); return; }
-    setProcessing(true); setError(null);
+    setProcessing(true);
+    setError(null);
     try {
-      const r = await processDocument(docId.trim());
-      setDocStatus({ document_id: r.document_id, status: r.status, fields_extracted: r.fields_extracted, line_items_extracted: r.line_items_extracted });
-      toast(`Processing complete — ${r.fields_extracted} fields extracted`, 'success');
-    } catch (err) { setError(err.message); toast(err.message, 'error'); }
-    finally { setProcessing(false); }
+      const result = await processDocument(docId.trim());
+      setDocStatus({
+        document_id:           result.document_id,
+        status:                result.status,
+        fields_extracted:      result.fields_extracted,
+        line_items_extracted:  result.line_items_extracted,
+      });
+      toast(`Processing complete — ${result.fields_extracted} fields extracted`, 'success');
+    } catch (err) {
+      setError(err.message);
+      toast(err.message, 'error');
+    } finally {
+      setProcessing(false);
+    }
   };
 
-  const handleCheck = async () => {
+  const handleCheckStatus = async () => {
     if (!docId.trim()) { toast('Please enter a document ID', 'error'); return; }
     try {
-      const r = await getDocumentStatus(docId.trim());
-      setDocStatus(r); setError(null);
-    } catch (err) { setError(err.message); toast(err.message, 'error'); }
+      const result = await getDocumentStatus(docId.trim());
+      setDocStatus(result);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+      toast(err.message, 'error');
+    }
   };
 
   const current = docStatus?.status || '';
-  const terminal = ['review_pending','approved','rejected'].includes(current);
+  const isTerminal = ['review_pending','approved','rejected','failed'].includes(current);
 
   return (
     <div className="page-wrap">
-      <div className="page-hd">
-        <div>
-          <h1 className="page-title">Document Processing</h1>
-          <p className="page-subtitle">Run the AI pipeline and monitor extraction progress</p>
-        </div>
+      <div className="page-header">
+        <h1 className="page-title">Document Processing</h1>
+        <p className="page-subtitle">Run the AI pipeline on your uploaded document</p>
       </div>
 
-      {/* Input */}
-      <div className="field" style={{ marginBottom: 16 }}>
-        <label className="field-label">Document ID</label>
-        <div className="proc-input-row">
-          <input className="field-input" type="text" value={docId}
-            onChange={e => setDocId(e.target.value)} placeholder="Enter document UUID…" />
-          <button className="btn btn-primary" onClick={handleProcess} disabled={processing}>
-            {processing ? <><span className="spinner" /> Processing…</> : 'Run Pipeline'}
-          </button>
-          <button className="btn btn-ghost" onClick={handleCheck}>Check Status</button>
+      {/* Input row */}
+      <div className="processing__search-row">
+        <div style={{ flex: 1 }}>
+          <label className="form-label">Document ID</label>
+          <input
+            className="form-input"
+            type="text"
+            value={docId}
+            onChange={(e) => setDocId(e.target.value)}
+            placeholder="Enter document UUID…"
+          />
         </div>
+        <button className="btn btn--primary" onClick={handleProcess} disabled={processing}>
+          {processing
+            ? <><SpinnerSmall /> Processing…</>
+            : <>
+                <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M10 4v8M6 8l4-4 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="10" cy="14" r="2" stroke="currentColor" strokeWidth="1.5"/></svg>
+                Process
+              </>
+          }
+        </button>
+        <button className="btn btn--secondary" onClick={handleCheckStatus}>
+          Check Status
+        </button>
       </div>
 
-      {error && <div className="alert alert--error" style={{ marginBottom:16 }}>{error}</div>}
-
-      {/* Doc info card */}
-      {docStatus && (
-        <div className="proc-doc-card">
-          <div className="proc-doc-card__icon"><DocIcon /></div>
-          <div>
-            <div className="proc-doc-card__name">{docStatus.filename || `Document — ${docStatus.document_id}`}</div>
-            <div className="proc-doc-card__meta">
-              Status: <strong>{current}</strong>
-              {docStatus.fields_extracted != null && ` · ${docStatus.fields_extracted} fields extracted`}
-              {docStatus.line_items_extracted != null && ` · ${docStatus.line_items_extracted} line items`}
-              {docStatus.uploaded_at && ` · ${new Date(docStatus.uploaded_at).toLocaleString()}`}
-            </div>
-          </div>
+      {/* Error */}
+      {error && (
+        <div className="processing__error">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style={{flexShrink:0}}>
+            <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/>
+            <path d="M10 6v5M10 14v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          {error}
         </div>
       )}
 
-      {/* Stepper */}
-      <div className="card">
-        <div className="card-title">Pipeline Progress</div>
-        <div className="stepper">
-          {STEPS.map((s, i) => {
-            const st = docStatus ? stepStatus(s.key, current) : 'pending';
+      {/* Document status card */}
+      {docStatus && (
+        <div className="processing__status-card">
+          <div className="processing__doc-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8L14 2z" stroke="currentColor" strokeWidth="1.5"/>
+              <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5"/>
+            </svg>
+          </div>
+          <div style={{ flex: 1 }}>
+            <div className="processing__doc-name">
+              {docStatus.filename || `Document ${docStatus.document_id?.slice(0, 8)}…`}
+            </div>
+            <div className="processing__doc-meta">
+              ID: {docStatus.document_id}
+              {docStatus.fields_extracted != null && ` · ${docStatus.fields_extracted} fields`}
+              {docStatus.line_items_extracted != null && ` · ${docStatus.line_items_extracted} line items`}
+            </div>
+          </div>
+          <span className={`badge ${
+            current === 'approved'      ? 'badge--success' :
+            current === 'rejected'      ? 'badge--error'   :
+            current === 'review_pending'? 'badge--accent'  :
+            current === 'failed'        ? 'badge--error'   :
+            'badge--warning'
+          }`}>
+            {current.replace(/_/g,' ')}
+          </span>
+        </div>
+      )}
+
+      {/* Pipeline steps */}
+      <div className="card" style={{ marginBottom: 'var(--sp-6)' }}>
+        <div className="card-title">Processing Pipeline</div>
+        <div className="pipeline">
+          {STEPS.map((step, idx) => {
+            const status = docStatus ? stepStatus(step.key, current) : 'pending';
             return (
-              <div key={s.key} className={`step step--${st}`}>
-                <div className="step__indicator">
-                  {st === 'done' ? <CheckSm /> : <span>{i + 1}</span>}
+              <div
+                className={`pipeline__step pipeline__step--${status} animate-slide-up`}
+                key={step.key}
+                style={{ animationDelay: `${idx * 80}ms` }}
+              >
+                <div className="pipeline__icon">
+                  {status === 'done'   ? <CheckIcon /> :
+                   status === 'active' && processing ? <SpinnerSmall /> :
+                   step.icon}
                 </div>
-                <div className="step__body">
-                  <div className="step__name">
-                    {s.name}
-                    <span className={`badge step__status-pill ${st === 'done' ? 'badge--success' : st === 'active' ? 'badge--accent' : 'badge--default'}`}>
-                      {st === 'done' ? 'Complete' : st === 'active' ? 'In Progress' : 'Pending'}
+                <div className="pipeline__body">
+                  <div className="pipeline__step-header">
+                    <span className="pipeline__step-name">{step.name}</span>
+                    <span className="pipeline__step-status">
+                      {status === 'done'   ? '✓ Complete' :
+                       status === 'active' ? (processing ? 'Running…' : 'Current') :
+                       'Pending'}
                     </span>
                   </div>
-                  <div className="step__desc">{s.desc}</div>
-                  {st === 'done' && (
-                    <div className="step__progress">
-                      <div className="step__progress-fill" style={{ width:'100%' }} />
+                  <div className="pipeline__step-desc">{step.desc}</div>
+                  {status === 'active' && (
+                    <div className="pipeline__progress-bar">
+                      <div className={`pipeline__progress-fill${processing ? '' : ' pipeline__progress-fill--done'}`}
+                        style={!processing ? { width: '100%', animation: 'none', background: 'var(--accent)' } : {}} />
+                    </div>
+                  )}
+                  {status === 'done' && (
+                    <div className="pipeline__progress-bar">
+                      <div className="pipeline__progress-fill pipeline__progress-fill--done" style={{ width: '100%' }} />
                     </div>
                   )}
                 </div>
@@ -135,14 +248,16 @@ export default function ProcessingPage() {
         </div>
       </div>
 
-      {/* Navigation actions */}
-      {docStatus && terminal && (
-        <div className="proc-nav-actions">
-          <button className="btn btn-ghost" onClick={() => navigate(`/validation/${docStatus.document_id}`)}>
-            View Validation →
+      {/* Nav actions when ready */}
+      {isTerminal && (
+        <div className="processing__nav">
+          <button className="btn btn--primary" onClick={() => navigate(`/validation/${docStatus.document_id}`)}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M10 2l2 5.5H18l-4.9 3.6 1.9 5.6L10 13.3l-5 3.4 1.9-5.6L2 7.5h6L10 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>
+            Validate Fields
           </button>
-          <button className="btn btn-primary" onClick={() => navigate(`/review/${docStatus.document_id}`)}>
-            Go to Review →
+          <button className="btn btn--secondary" onClick={() => navigate(`/review/${docStatus.document_id}`)}>
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M10 4C6 4 2.7 7.6 2 10c.7 2.4 4 6 8 6s7.3-3.6 8-6c-.7-2.4-4-6-8-6z" stroke="currentColor" strokeWidth="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/></svg>
+            Review Document
           </button>
         </div>
       )}

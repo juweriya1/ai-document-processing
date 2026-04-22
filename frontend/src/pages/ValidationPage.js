@@ -5,179 +5,264 @@ import { getDocumentFields, validateDocument, submitCorrection } from '../api/cl
 import { useToast } from '../components/Toast';
 import './ValidationPage.css';
 
-function statusBadgeClass(s) {
-  return s === 'valid' ? 'badge--success' : s === 'invalid' ? 'badge--danger' : s === 'corrected' ? 'badge--info' : 'badge--default';
+function ConfidenceBar({ value }) {
+  if (value == null) return <span style={{ color: 'var(--text-5)', fontSize: 12 }}>—</span>;
+  const pct  = Math.round(value * 100);
+  const color = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--error)';
+  return (
+    <div className="confidence-bar">
+      <div className="confidence-bar__track">
+        <div className="confidence-bar__fill" style={{ width: `${pct}%`, background: color }} />
+      </div>
+      <span className="confidence-bar__label">{pct}%</span>
+    </div>
+  );
 }
-function confClass(c) { return c >= 0.85 ? 'high' : c >= 0.6 ? 'mid' : 'low'; }
+
+const SkeletonRow = () => (
+  <tr>
+    {[140, 180, 80, 70, 60].map((w, i) => (
+      <td key={i}><div className="skeleton" style={{ height: 14, width: w, borderRadius: 4 }} /></td>
+    ))}
+  </tr>
+);
 
 export default function ValidationPage() {
   const { documentId: paramId } = useParams();
-  const navigate = useNavigate();
-  const { user }  = useAuth();
-  const toast     = useToast();
+  const navigate                = useNavigate();
+  const { user }                = useAuth();
+  const toast                   = useToast();
 
-  const [docId, setDocId]     = useState(paramId || '');
-  const [fields, setFields]   = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [editingId, setEditId] = useState(null);
-  const [editVal, setEditVal] = useState('');
-  const [valResult, setValResult] = useState(null);
+  const [docId, setDocId]               = useState(paramId || '');
+  const [fields, setFields]             = useState([]);
+  const [loading, setLoading]           = useState(false);
+  const [editingField, setEditingField] = useState(null);
+  const [editValue, setEditValue]       = useState('');
+  const [validationResult, setValResult]= useState(null);
 
   const canEdit = user?.role === 'reviewer' || user?.role === 'admin';
 
-  useEffect(() => { if (paramId) { setDocId(paramId); loadFields(paramId); } }, [paramId]); // eslint-disable-line
+  useEffect(() => {
+    if (paramId) { setDocId(paramId); loadFields(paramId); }
+  }, [paramId]); // eslint-disable-line
 
   const loadFields = async (id) => {
     setLoading(true);
-    try { const d = await getDocumentFields(id); setFields(d); }
-    catch (err) { toast(err.message, 'error'); }
-    finally { setLoading(false); }
+    try {
+      const data = await getDocumentFields(id);
+      setFields(data);
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleLoad = () => { if (!docId.trim()) { toast('Enter a document ID', 'error'); return; } loadFields(docId.trim()); };
+  const handleLoad = () => {
+    if (!docId.trim()) { toast('Please enter a document ID', 'error'); return; }
+    loadFields(docId.trim());
+  };
 
   const handleValidate = async () => {
     if (!docId.trim()) return;
     try {
-      const d = await validateDocument(docId.trim());
-      setValResult(d.summary);
+      const data = await validateDocument(docId.trim());
+      setValResult(data.summary);
       await loadFields(docId.trim());
       toast('Validation complete', 'success');
-    } catch (err) { toast(err.message, 'error'); }
+    } catch (err) {
+      toast(err.message, 'error');
+    }
   };
 
-  const handleSaveEdit = async (fieldId) => {
+  const handleStartEdit = (field) => {
+    setEditingField(field.id);
+    setEditValue(field.fieldValue || '');
+  };
+
+  const handleCancelEdit = () => { setEditingField(null); setEditValue(''); };
+
+  const handleSave = async (fieldId) => {
     try {
-      await submitCorrection(docId.trim(), fieldId, editVal);
+      await submitCorrection(docId.trim(), fieldId, editValue);
       toast('Correction saved', 'success');
-      setEditId(null); setEditVal('');
+      setEditingField(null);
+      setEditValue('');
       await loadFields(docId.trim());
-    } catch (err) { toast(err.message, 'error'); }
+    } catch (err) {
+      toast(err.message, 'error');
+    }
   };
 
-  const counts = fields.reduce((acc, f) => { acc[f.status] = (acc[f.status] || 0) + 1; return acc; }, {});
-  const summaryItems = [
-    { key: 'valid',     label: 'Valid',     color: 'var(--success)' },
-    { key: 'invalid',   label: 'Invalid',   color: 'var(--danger)' },
-    { key: 'corrected', label: 'Corrected', color: 'var(--info)' },
-    { key: 'pending',   label: 'Pending',   color: 'var(--warning)' },
-  ];
+  // Summary counts from fields
+  const counts = fields.reduce((acc, f) => {
+    acc[f.status] = (acc[f.status] || 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div className="page-wrap">
-      <div className="page-hd">
-        <div>
-          <h1 className="page-title">Data Validation</h1>
-          <p className="page-subtitle">Review extracted fields and submit corrections</p>
-        </div>
-        {canEdit && fields.length > 0 && (
-          <button className="btn btn-primary" onClick={handleValidate}>Run Validation</button>
-        )}
+      <div className="page-header">
+        <h1 className="page-title">Data Validation</h1>
+        <p className="page-subtitle">Review extracted fields and submit corrections</p>
       </div>
 
-      {/* Doc ID input (only if not from URL param) */}
+      {/* Doc ID input */}
       {!paramId && (
-        <div className="field" style={{ marginBottom: 20 }}>
-          <label className="field-label">Document ID</label>
-          <div style={{ display:'flex', gap:10 }}>
-            <input className="field-input" type="text" value={docId}
-              onChange={e => setDocId(e.target.value)} placeholder="Enter document UUID…" />
-            <button className="btn btn-ghost" onClick={handleLoad}>Load Fields</button>
+        <div style={{ display: 'flex', gap: 'var(--sp-3)', marginBottom: 'var(--sp-6)', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1 }}>
+            <label className="form-label">Document ID</label>
+            <input
+              className="form-input"
+              value={docId}
+              onChange={(e) => setDocId(e.target.value)}
+              placeholder="Enter document UUID…"
+            />
           </div>
+          <button className="btn btn--primary" onClick={handleLoad}>Load Fields</button>
         </div>
       )}
 
-      {/* Validation result summary */}
-      {(valResult || fields.length > 0) && (
-        <div className="val-summary">
-          {summaryItems.map(({ key, label, color }) => (
-            <div className="val-summary__item" key={key}>
-              <div className="val-summary__dot" style={{ background: color }} />
-              <span className="val-summary__label">{label}</span>
-              <span className="val-summary__count">{counts[key] || 0}</span>
+      {/* Summary chips */}
+      {fields.length > 0 && !loading && (
+        <div className="validation__summary-strip">
+          {counts.valid != null && (
+            <div className="validation__summary-chip validation__summary-chip--valid">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/><path d="M6.5 10l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              {counts.valid} Valid
             </div>
-          ))}
+          )}
+          {counts.invalid != null && (
+            <div className="validation__summary-chip validation__summary-chip--invalid">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/><path d="M7 13l6-6M13 13L7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              {counts.invalid} Invalid
+            </div>
+          )}
+          {counts.corrected != null && (
+            <div className="validation__summary-chip validation__summary-chip--corrected">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="none"><path d="M4 14l4-4 2 2 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              {counts.corrected} Corrected
+            </div>
+          )}
+          {counts.pending != null && (
+            <div className="validation__summary-chip validation__summary-chip--pending">
+              {counts.pending} Pending
+            </div>
+          )}
+          {validationResult && (
+            <div className="validation__summary-chip validation__summary-chip--pending" style={{ marginLeft: 'auto' }}>
+              Last run: {validationResult.valid} valid / {validationResult.invalid} invalid
+            </div>
+          )}
         </div>
       )}
 
-      {/* Loading */}
-      {loading && (
-        <div className="val-loading"><span className="spinner" /> Loading extracted fields…</div>
-      )}
-
-      {/* Fields table */}
-      {!loading && fields.length > 0 && (
-        <>
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
+      {/* Table */}
+      <div className="validation__table-wrap">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Field Name</th>
+              <th>Extracted Value</th>
+              <th>Confidence</th>
+              <th>Status</th>
+              {canEdit && <th>Actions</th>}
+            </tr>
+          </thead>
+          <tbody>
+            {loading
+              ? Array.from({ length: 6 }).map((_, i) => <SkeletonRow key={i} />)
+              : fields.length === 0
+              ? (
                 <tr>
-                  <th>Field Name</th>
-                  <th>Extracted Value</th>
-                  <th>Confidence</th>
-                  <th>Status</th>
-                  {canEdit && <th>Actions</th>}
+                  <td colSpan={canEdit ? 5 : 4}>
+                    <div className="empty-state" style={{ padding: 'var(--sp-10)' }}>
+                      <svg className="empty-state__icon" viewBox="0 0 24 24" fill="none"><path d="M9 12h6M9 16h6M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8L14 2z" stroke="currentColor" strokeWidth="1.5"/><path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5"/></svg>
+                      <div className="empty-state__title">No fields extracted</div>
+                      <div className="empty-state__desc">Process the document first to see extracted fields here</div>
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {fields.map(f => (
-                  <tr key={f.id} style={f.status === 'invalid' ? { background:'rgba(248,113,113,0.04)' } : {}}>
-                    <td style={{ fontWeight:600, color:'var(--text-1)' }}>{f.fieldName}</td>
+              )
+              : fields.map((field, idx) => (
+                <tr
+                  key={field.id}
+                  className="animate-fade-in"
+                  style={{ animationDelay: `${idx * 20}ms` }}
+                >
+                  <td>
+                    <span style={{ fontWeight: 500, color: 'var(--text-1)' }}>
+                      {field.fieldName}
+                    </span>
+                  </td>
+                  <td>
+                    {editingField === field.id ? (
+                      <input
+                        className="validation__edit-input"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSave(field.id);
+                          if (e.key === 'Escape') handleCancelEdit();
+                        }}
+                      />
+                    ) : (
+                      <span
+                        style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 12,
+                          color: field.status === 'corrected' ? 'var(--warning)' : 'var(--text-2)',
+                        }}
+                      >
+                        {field.fieldValue || '—'}
+                      </span>
+                    )}
+                  </td>
+                  <td><ConfidenceBar value={field.confidence} /></td>
+                  <td>
+                    <span className={`vs-pill vs-pill--${field.status}`}>
+                      {field.status}
+                    </span>
+                  </td>
+                  {canEdit && (
                     <td>
-                      {editingId === f.id ? (
-                        <input className="val-edit-input" value={editVal}
-                          onChange={e => setEditVal(e.target.value)} autoFocus
-                          onKeyDown={e => e.key === 'Enter' && handleSaveEdit(f.id)} />
+                      {editingField === field.id ? (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <button className="btn btn--success btn--sm" onClick={() => handleSave(field.id)}>Save</button>
+                          <button className="btn btn--ghost btn--sm" onClick={handleCancelEdit}>Cancel</button>
+                        </div>
                       ) : (
-                        <span className={f.status === 'corrected' ? '' : ''} style={f.status === 'corrected' ? { color:'var(--info)' } : {}}>
-                          {f.fieldValue || '—'}
-                        </span>
+                        <button
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => handleStartEdit(field)}
+                        >
+                          <svg width="12" height="12" viewBox="0 0 20 20" fill="none"><path d="M14 2l4 4-10 10H4v-4L14 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>
+                          Edit
+                        </button>
                       )}
                     </td>
-                    <td>
-                      {f.confidence != null ? (
-                        <div className="conf-bar">
-                          <div className="conf-bar__track">
-                            <div className={`conf-bar__fill conf-bar__fill--${confClass(f.confidence)}`}
-                              style={{ width: `${(f.confidence*100).toFixed(0)}%` }} />
-                          </div>
-                          <span className="conf-bar__label">{(f.confidence*100).toFixed(1)}%</span>
-                        </div>
-                      ) : '—'}
-                    </td>
-                    <td><span className={`badge ${statusBadgeClass(f.status)}`}>{f.status}</span></td>
-                    {canEdit && (
-                      <td>
-                        <div className="val-actions">
-                          {editingId === f.id ? (
-                            <>
-                              <button className="btn btn-success btn-sm" onClick={() => handleSaveEdit(f.id)}>Save</button>
-                              <button className="btn btn-ghost btn-sm" onClick={() => { setEditId(null); setEditVal(''); }}>Cancel</button>
-                            </>
-                          ) : (
-                            <button className="btn btn-ghost btn-sm" onClick={() => { setEditId(f.id); setEditVal(f.fieldValue || ''); }}>Edit</button>
-                          )}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="val-footer">
-            <button className="btn btn-primary" onClick={() => navigate(`/review/${docId.trim()}`)}>
-              Proceed to Review →
-            </button>
-          </div>
-        </>
-      )}
+                  )}
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
 
-      {!loading && fields.length === 0 && docId && paramId && (
-        <div className="empty-state" style={{ marginTop: 40 }}>
-          <span style={{ fontSize: 32 }}>📋</span>
-          No extracted fields found. Process the document first.
-          <button className="btn btn-ghost btn-sm" onClick={() => navigate(`/processing/${docId}`)}>Go to Processing</button>
+      {/* Footer */}
+      {fields.length > 0 && (
+        <div className="validation__footer">
+          {canEdit && (
+            <button className="btn btn--secondary" onClick={handleValidate}>
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/><path d="M7 10l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              Run Validation
+            </button>
+          )}
+          <button className="btn btn--primary" onClick={() => navigate(`/review/${docId.trim()}`)}>
+            Proceed to Review
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M8 4l6 6-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
         </div>
       )}
     </div>

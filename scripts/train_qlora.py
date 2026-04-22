@@ -1,6 +1,6 @@
-"""train_qlora.py — QLoRA fine-tuning of Qwen2-VL-7B-Instruct on CORD v2 + SROIE.
+"""train_qlora.py — QLoRA fine-tuning of Qwen2-VL-7B-Instruct on SROIE (English receipts).
 
-Designed for an A100 MIG 2g.20gb (20 GB VRAM). Typical run: ~500 steps, 2-4 hours.
+Designed for an A100 80GB. Typical run: ~500 steps, ~1 hour.
 
 Usage:
     python scripts/train_qlora.py
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_OUTPUT_DIR = "adapters/qwen2vl_cord_sroie"
+DEFAULT_OUTPUT_DIR = "adapters/qwen2vl_sroie"
 DEFAULT_MAX_STEPS = 500
 DEFAULT_LR = 2e-4
 DEFAULT_BATCH_SIZE = 1
@@ -59,60 +59,6 @@ EXTRACTION_PROMPT = (
 # ---------------------------------------------------------------------------
 # Ground truth parsers
 # ---------------------------------------------------------------------------
-
-def parse_cord_ground_truth(row: dict[str, Any]) -> dict[str, Any]:
-    """Parse a CORD v2 row's ground_truth JSON string into a canonical GT dict.
-
-    Returns a dict with the 7 canonical keys (invoice_number always None for CORD).
-    line_items is a list of dicts with description/quantity/unit_price/total.
-    """
-    try:
-        parsed = json.loads(row["ground_truth"])
-    except (json.JSONDecodeError, KeyError, TypeError):
-        return _empty_gt()
-
-    gt = parsed.get("gt_parse", {})
-
-    vendor_name = gt.get("store_info", {}).get("store_name")
-    total_info = gt.get("total", {})
-    total_amount = total_info.get("total_price")
-    subtotal = total_info.get("subtotal_price")
-    tax = total_info.get("tax_price")
-
-    line_items = []
-    for item in gt.get("menu", []):
-        description = str(item.get("nm", "")).strip()
-        if not description:
-            continue
-        try:
-            quantity = float(str(item.get("cnt") or "1").replace(",", ""))
-        except (ValueError, TypeError):
-            quantity = 1.0
-        try:
-            unit_price = float(str(item.get("unitprice") or "0").replace(",", ""))
-        except (ValueError, TypeError):
-            unit_price = 0.0
-        try:
-            total = float(str(item.get("price") or "0").replace(",", ""))
-        except (ValueError, TypeError):
-            total = 0.0
-        line_items.append({
-            "description": description,
-            "quantity": quantity,
-            "unit_price": unit_price,
-            "total": total,
-        })
-
-    return {
-        "invoice_number": None,
-        "date": None,
-        "vendor_name": str(vendor_name).strip() if vendor_name else None,
-        "total_amount": str(total_amount).strip() if total_amount else None,
-        "subtotal": str(subtotal).strip() if subtotal else None,
-        "tax": str(tax).strip() if tax else None,
-        "line_items": line_items,
-    }
-
 
 def parse_sroie_ground_truth(row: dict[str, Any]) -> dict[str, Any]:
     """Parse a SROIE row into a canonical GT dict.
@@ -194,34 +140,25 @@ def _row_to_example(pil_image: Any, gt_dict: dict[str, Any]) -> dict[str, Any]:
     return {"messages": messages, "images": [pil_image]}
 
 
-def build_cord_dataset():
-    """Load CORD v2 train split and convert to a list of conversation examples."""
-    from datasets import load_dataset  # type: ignore[import]
-
-    logger.info("Loading CORD v2 train split …")
-    dataset = load_dataset("naver-clova-ix/cord-v2", split="train")
-    examples = []
-    skipped = 0
-    for row in dataset:
-        pil_image = row.get("image")
-        if pil_image is None:
-            skipped += 1
-            continue
-        gt = parse_cord_ground_truth(row)
-        examples.append(_row_to_example(pil_image, gt))
-    logger.info("CORD: %d examples loaded, %d skipped", len(examples), skipped)
-    return examples
-
-
 def build_sroie_dataset():
-    """Load SROIE train split and convert to a list of conversation examples."""
+    """Load SROIE train split (English receipts) and convert to conversation examples."""
     from datasets import load_dataset  # type: ignore[import]
 
     logger.info("Loading SROIE train split …")
-    try:
-        dataset = load_dataset("darentang/sroie", "original", split="train")
-    except Exception:
-        dataset = load_dataset("sroie", split="train")
+    dataset = None
+    for ds_id, kwargs in [
+        ("mychen76/invoices-and-receipts_ocr_v1", {"split": "train"}),
+        ("darentang/sroie", {"config_name": "original", "split": "train", "trust_remote_code": True}),
+    ]:
+        try:
+            dataset = load_dataset(ds_id, **kwargs)
+            logger.info("Loaded SROIE from %s", ds_id)
+            break
+        except Exception as e:
+            logger.warning("Could not load %s: %s", ds_id, e)
+
+    if dataset is None:
+        raise RuntimeError("No SROIE-compatible dataset could be loaded. Check network access.")
 
     examples = []
     skipped = 0
@@ -236,21 +173,19 @@ def build_sroie_dataset():
     return examples
 
 
-def build_combined_dataset():
-    """Concatenate and shuffle CORD + SROIE training examples.
+def build_training_dataset():
+    """Build SROIE-only training dataset (English receipts).
 
     Returns a HuggingFace Dataset with columns: messages, images.
     """
     import random
     from datasets import Dataset  # type: ignore[import]
 
-    cord_examples = build_cord_dataset()
-    sroie_examples = build_sroie_dataset()
-    combined = cord_examples + sroie_examples
+    examples = build_sroie_dataset()
     random.seed(42)
-    random.shuffle(combined)
-    logger.info("Combined dataset: %d examples", len(combined))
-    return Dataset.from_list(combined)
+    random.shuffle(examples)
+    logger.info("Training dataset: %d examples", len(examples))
+    return Dataset.from_list(examples)
 
 
 # ---------------------------------------------------------------------------
@@ -399,7 +334,7 @@ def train(
     from transformers import TrainingArguments  # type: ignore[import]
     from trl import SFTTrainer  # type: ignore[import]
 
-    dataset = build_combined_dataset()
+    dataset = build_training_dataset()
     model, processor = load_base_model_4bit(model_name)
     model = apply_lora(model)
 
@@ -449,7 +384,7 @@ def train(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="QLoRA fine-tuning of Qwen2-VL-7B-Instruct on CORD v2 + SROIE."
+        description="QLoRA fine-tuning of Qwen2-VL-7B-Instruct on SROIE (English receipts)."
     )
     parser.add_argument("--output_dir", default=DEFAULT_OUTPUT_DIR,
                         help="Directory to write adapter weights (default: %(default)s)")

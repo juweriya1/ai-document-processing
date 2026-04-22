@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 
@@ -16,9 +17,9 @@ class RegisterRequest(BaseModel):
     role: str = "enterprise_user"
 
 
-class LoginRequest(BaseModel):
-    email: str
-    password: str
+# class LoginRequest(BaseModel):
+#     email: str
+#     password: str
 
 
 class UserResponse(BaseModel):
@@ -28,9 +29,14 @@ class UserResponse(BaseModel):
     role: str
 
 
+# class LoginResponse(BaseModel):
+#     accessToken: str
+#     tokenType: str = "bearer"
+#     user: UserResponse
+
 class LoginResponse(BaseModel):
-    accessToken: str
-    tokenType: str = "bearer"
+    access_token: str
+    token_type: str = "bearer"
     user: UserResponse
 
 
@@ -47,15 +53,38 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(req: LoginRequest, db: Session = Depends(get_db)):
-    user = get_user_by_email(db, req.email)
-    if not user or not verify_password(req.password, user.password_hash):
+def login(
+    db: Session = Depends(get_db),
+    form_data: OAuth2PasswordRequestForm = Depends()
+):
+    user = get_user_by_email(db, form_data.username)
+
+    if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
-    token = create_access_token(data={"sub": user.email, "role": user.role, "user_id": user.id})
+
+    token = create_access_token(
+        data={"sub": user.email, "role": user.role, "user_id": user.id}
+    )
+
+    # return LoginResponse(
+    #     accessToken=token,
+    #     user=UserResponse(
+    #         id=user.id,
+    #         email=user.email,
+    #         name=user.name,
+    #         role=user.role,
+    #     ),
+    # )
+
     return LoginResponse(
-        accessToken=token,
-        user=UserResponse(id=user.id, email=user.email, name=user.name, role=user.role),
+        access_token=token,
+        user=UserResponse(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            role=user.role,
+        ),
     )

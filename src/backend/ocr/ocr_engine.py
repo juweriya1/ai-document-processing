@@ -41,7 +41,7 @@ class OCREngine:
             EasyOCR + pdfplumber (used for baseline benchmarking and CPU-only environments).
     """
 
-    def __init__(self, languages: list[str] | None = None, use_got_ocr: bool = True):
+    def __init__(self, languages: list[str] | None = None, use_got_ocr: bool = False):
         self._languages = languages or ["en"]
         self._use_got_ocr = use_got_ocr
         # GOT-OCR 2.0 components (lazy-loaded)
@@ -104,6 +104,7 @@ class OCREngine:
         return 0.50
 
     def _ocr_page_with_got(self, image: np.ndarray, page_number: int = 1) -> OCRResult:
+        logger.info("USING GOT OCR")
         """Run GOT-OCR 2.0 on a single page image.
 
         GOT-OCR requires a file path as input, so we write the image to a temporary
@@ -180,6 +181,30 @@ class OCREngine:
         return self._reader
 
     def _ocr_page_with_easyocr(self, image: np.ndarray, page_number: int = 1) -> OCRResult:
+        logger.info("USING EASYOCR")
+        import cv2
+
+        logger.info("EASYOCR INPUT SHAPE: %s", image.shape)
+        logger.info("EASYOCR MIN/MAX: %s / %s", image.min(), image.max())
+
+        # SAVE IMAGE TO SEE WHAT OCR IS RECEIVING
+        cv2.imwrite(f"/tmp/debug_page_{page_number}.png", image)
+        logger.info("EASYOCR INPUT TYPE: %s", type(image))
+
+        if image is None:
+            logger.error("EASYOCR received None image")
+            return OCRResult(text="", confidence=0.0, bounding_boxes=[], page_number=page_number)
+
+        logger.info("EASYOCR INPUT SHAPE: %s", getattr(image, "shape", None))
+
+        try:
+            logger.info(
+                "EASYOCR INPUT MIN/MAX: %s / %s",
+                image.min(),
+                image.max()
+            )
+        except Exception as e:
+            logger.warning("Could not compute min/max: %s", e)
         """Run EasyOCR on a single page image (baseline/fallback mode)."""
         gray = image
         if len(image.shape) == 3:
@@ -187,6 +212,7 @@ class OCREngine:
             gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
 
         results = self.reader.readtext(gray)
+        logger.info("EASYOCR RAW RESULT COUNT: %s", len(results))
 
         if not results:
             return OCRResult(text="", confidence=0.0, bounding_boxes=[], page_number=page_number)
@@ -196,6 +222,8 @@ class OCREngine:
             texts.append(text)
             confidences.append(conf)
             bboxes.append([int(coord) for point in bbox for coord in point])
+
+        logger.info("EASYOCR FINAL TEXT LENGTH: %s", len(" ".join(texts)))
 
         return OCRResult(
             text=" ".join(texts),
@@ -250,21 +278,37 @@ class OCREngine:
     def process_document(
         self, pages: list[PreprocessedPage], pdf_path: str | None = None
     ) -> DocumentOCRResult:
-        """Process a full document: OCR all pages and extract tables.
 
-        Args:
-            pages: Preprocessed page images from Preprocessing.preprocess_document().
-            pdf_path: Path to the original PDF file (required for table extraction).
+        logger.info("PAGES RECEIVED: %s", len(pages))
+        logger.info("PDF PATH: %s", pdf_path)
 
-        Returns:
-            DocumentOCRResult with per-page OCR results, extracted tables, and full text.
-        """
         ocr_pages = []
+
         for page in pages:
-            result = self.extract_text_from_image(page.processed, page_number=page.page_number)
+            logger.info("OCR PAGE INPUT SHAPE: %s", getattr(page.processed, "shape", None))
+
+            result = self.extract_text_from_image(
+                page.processed,
+                page_number=page.page_number
+            )
+
+            logger.info("OCR PAGE RESULT LENGTH: %s", len(result.text or ""))
+            logger.info(
+                "PAGE %s OCR TEXT PREVIEW: %s",
+                page.page_number,
+                result.text[:100]
+            )
             ocr_pages.append(result)
 
+        logger.info("OCR TOTAL PAGES PROCESSED: %s", len(ocr_pages))
+
+        if ocr_pages:
+            logger.info("SAMPLE OCR TEXT: %s", ocr_pages[0].text[:200])
+        else:
+            logger.info("SAMPLE OCR TEXT: EMPTY")
+
         tables = []
+
         if pdf_path:
             tables = self.extract_tables_from_pdf(pdf_path)
 

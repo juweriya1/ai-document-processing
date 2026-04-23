@@ -43,12 +43,17 @@ class PipelineOrchestrator:
         file_path = f"uploads/{doc.filename}"
 
         try:
+            from src.backend.db.models import ExtractedField, LineItem
+            self.db.query(ExtractedField).filter(ExtractedField.document_id == document_id).delete()
+            self.db.query(LineItem).filter(LineItem.document_id == document_id).delete()
+            self.db.commit()
+            
             # 1. preprocessing (image/pdf cleanup)
             update_document_status(self.db, document_id, "preprocessing")
             pages = self.preprocessor.preprocess_document(file_path)
 
             # 2. OCR (AI layer)
-            update_document_status(self.db, document_id, "extracting_text")
+            update_document_status(self.db, document_id, "extracting")
             ocr_result = self.ocr.process_document(pages, pdf_path=file_path)
 
             # 3. entity extraction (AI layer)

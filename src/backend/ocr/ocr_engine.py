@@ -275,47 +275,75 @@ class OCREngine:
             return self._extract_tables_with_docling(pdf_path)
         return self._extract_tables_with_pdfplumber(pdf_path)
 
-    def process_document(
-        self, pages: list[PreprocessedPage], pdf_path: str | None = None
-    ) -> DocumentOCRResult:
+    # def process_document(
+    #     self, pages: list[PreprocessedPage], pdf_path: str | None = None
+    # ) -> DocumentOCRResult:
 
-        logger.info("PAGES RECEIVED: %s", len(pages))
-        logger.info("PDF PATH: %s", pdf_path)
+    #     logger.info("PAGES RECEIVED: %s", len(pages))
+    #     logger.info("PDF PATH: %s", pdf_path)
 
-        ocr_pages = []
+    #     ocr_pages = []
 
-        for page in pages:
-            logger.info("OCR PAGE INPUT SHAPE: %s", getattr(page.processed, "shape", None))
+    #     for page in pages:
+    #         logger.info("OCR PAGE INPUT SHAPE: %s", getattr(page.processed, "shape", None))
 
-            result = self.extract_text_from_image(
-                page.processed,
-                page_number=page.page_number
-            )
+    #         result = self.extract_text_from_image(
+    #             page.processed,
+    #             page_number=page.page_number
+    #         )
 
-            logger.info("OCR PAGE RESULT LENGTH: %s", len(result.text or ""))
-            logger.info(
-                "PAGE %s OCR TEXT PREVIEW: %s",
-                page.page_number,
-                result.text[:100]
-            )
-            ocr_pages.append(result)
+    #         logger.info("OCR PAGE RESULT LENGTH: %s", len(result.text or ""))
+    #         logger.info(
+    #             "PAGE %s OCR TEXT PREVIEW: %s",
+    #             page.page_number,
+    #             result.text[:100]
+    #         )
+    #         ocr_pages.append(result)
 
-        logger.info("OCR TOTAL PAGES PROCESSED: %s", len(ocr_pages))
+    #     logger.info("OCR TOTAL PAGES PROCESSED: %s", len(ocr_pages))
 
-        if ocr_pages:
-            logger.info("SAMPLE OCR TEXT: %s", ocr_pages[0].text[:200])
-        else:
-            logger.info("SAMPLE OCR TEXT: EMPTY")
+    #     if ocr_pages:
+    #         logger.info("SAMPLE OCR TEXT: %s", ocr_pages[0].text[:200])
+    #     else:
+    #         logger.info("SAMPLE OCR TEXT: EMPTY")
 
-        tables = []
+    #     tables = []
 
-        if pdf_path:
-            tables = self.extract_tables_from_pdf(pdf_path)
+    #     if pdf_path:
+    #         tables = self.extract_tables_from_pdf(pdf_path)
+
+    #     full_text = "\n\n".join(page.text for page in ocr_pages)
+
+    #     return DocumentOCRResult(
+    #         pages=ocr_pages,
+    #         tables=tables,
+    #         full_text=full_text,
+    #     )
+
+    def _extract_text_with_pdfplumber(self, pdf_path: str) -> str:
+        import pdfplumber
+        texts = []
+        try:
+            with pdfplumber.open(pdf_path) as pdf:
+                for page in pdf.pages:
+                    text = page.extract_text()
+                    if text:
+                        texts.append(text)
+        except Exception as e:
+            logger.warning("pdfplumber text extraction failed: %s", e)
+        return "\n\n".join(texts)
+
+    def process_document(self, pages, pdf_path=None):
+        ocr_pages = [
+            self.extract_text_from_image(page.processed, page.page_number)
+            for page in pages
+        ]
 
         full_text = "\n\n".join(page.text for page in ocr_pages)
 
-        return DocumentOCRResult(
-            pages=ocr_pages,
-            tables=tables,
-            full_text=full_text,
-        )
+        # ✅ ADD THIS: if OCR produced little/no text and we have a PDF, use pdfplumber for text too
+        if pdf_path and len(full_text.strip()) < 50:
+            full_text = self._extract_text_with_pdfplumber(pdf_path)
+
+        tables = self.extract_tables_from_pdf(pdf_path) if pdf_path else []
+        return DocumentOCRResult(pages=ocr_pages, tables=tables, full_text=full_text)

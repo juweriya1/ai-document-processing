@@ -1,183 +1,318 @@
+# import re
+
+
+# def extract_merchant_name(text: str):
+#     lines = [l.strip() for l in text.split("\n") if l.strip()]
+
+#     skip_words = {
+#         "invoice", "receipt", "tax", "bill", "order", "cash", "total",
+#         "date", "tel", "phone", "www", "http"
+#     }
+
+#     for line in lines[:8]:
+#         if len(line) < 3:
+#             continue
+#         if any(char.isdigit() for char in line) and len(line) < 6:
+#             continue
+
+#         low = line.lower()
+#         if any(w in low for w in skip_words):
+#             continue
+
+#         return line
+
+#     return None
+
+
+# def extract_invoice_number(text: str):
+#     patterns = [
+#         r"Invoice\s*#\s*([A-Za-z0-9\-_/]+)",
+#         r"Invoice\s*No\.?\s*[:\-]?\s*([A-Za-z0-9\-_/]+)",
+#         r"INVOICE\s*NO\.?\s*[:\-]?\s*([A-Za-z0-9\-_/]+)",
+#         r"Document\s*(?:No|Number)\s*[:\-]?\s*([A-Za-z0-9\-_/]+)",
+#         r"INV\s*#?\s*([A-Za-z0-9\-_/]+)",
+#     ]
+
+#     for p in patterns:
+#         match = re.search(p, text, re.IGNORECASE)
+#         if match:
+#             val = match.group(1).strip()
+#             val = re.split(r"\s|\n|\|", val)[0]
+#             return val
+
+#     return None
+
+
+# def extract_date(text: str):
+#     labeled_patterns = [
+#         r"Date\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+#         r"Invoice\s*Date\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+#         r"Date\s*[:\-]?\s*([A-Za-z]{3,9}\s*\d{1,2},?\s*\d{4})",
+#         r"Invoice\s*Date\s*[:\-]?\s*([A-Za-z]{3,9}\s*\d{1,2},?\s*\d{4})",
+#     ]
+
+#     generic_patterns = [
+#         r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
+#         r"\b\d{1,2}-[A-Za-z]{3}-\d{2,4}\b",
+#     ]
+
+#     for p in labeled_patterns:
+#         match = re.search(p, text, re.IGNORECASE)
+#         if match:
+#             return match.group(1)
+
+#     for p in generic_patterns:
+#         match = re.search(p, text)
+#         if match:
+#             return match.group(0)
+
+#     return None
+
+
+# def extract_total_amount(text: str):
+#     patterns = [
+#         r"Grand\s*Total\s*[:\-]?\s*([\d,]+\.\d{2})",
+#         r"Payable\s*[:\-]?\s*([\d,]+\.\d{2})",
+#         r"Total\s*Amount\s*[:\-]?\s*([\d,]+\.\d{2})",
+#         r"TOTAL\s*RM\s*([\d,]+\.\d{2})",
+#         r"Total\s*[:\-]?\s*([\d,]+\.\d{2})",
+#     ]
+
+#     candidates = []
+
+#     for p in patterns:
+#         for m in re.finditer(p, text, re.IGNORECASE):
+#             val = m.group(1).replace(",", "")
+#             try:
+#                 candidates.append(float(val))
+#             except:
+#                 pass
+
+#     if not candidates:
+#         return None
+
+#     return f"{max(candidates):.2f}"
+
+
+# # OPTIONAL FIELDS (light extraction only)
+
+# def extract_tax_amount(text: str):
+#     patterns = [
+#         r"Tax\s*@\s*\d+%[:\-]?\s*([\d,]+\.\d{2})",
+#         r"GST[:\-]?\s*([\d,]+\.\d{2})",
+#         r"SST[:\-]?\s*([\d,]+\.\d{2})",
+#         r"Sales\s*Tax[:\-]?\s*([\d,]+\.\d{2})",
+#     ]
+
+#     for p in patterns:
+#         m = re.search(p, text, re.IGNORECASE)
+#         if m:
+#             return m.group(1)
+
+#     return None
+
+
+# def extract_subtotal(text: str):
+#     patterns = [
+#         r"Sub\s*Total[:\-]?\s*([\d,]+\.\d{2})",
+#         r"Subtotal[:\-]?\s*([\d,]+\.\d{2})",
+#     ]
+
+#     for p in patterns:
+#         m = re.search(p, text, re.IGNORECASE)
+#         if m:
+#             return m.group(1)
+
+#     return None
+
+
+# def extract_discount(text: str):
+#     patterns = [
+#         r"Discount[:\-]?\s*([\d,]+\.\d{2})",
+#     ]
+
+#     for p in patterns:
+#         m = re.search(p, text, re.IGNORECASE)
+#         if m:
+#             return m.group(1)
+
+#     return None
+
+
+# def extract_cash_tendered(text: str):
+#     patterns = [
+#         r"Cash\s*Tendered[:\-]?\s*([\d,]+\.\d{2})",
+#         r"CASH[:\-]?\s*([\d,]+\.\d{2})",
+#     ]
+
+#     for p in patterns:
+#         m = re.search(p, text, re.IGNORECASE)
+#         if m:
+#             return m.group(1)
+
+#     return None
+
+
+# def extract_change(text: str):
+#     patterns = [
+#         r"Change[:\-]?\s*([\d,]+\.\d{2})",
+#     ]
+
+#     for p in patterns:
+#         m = re.search(p, text, re.IGNORECASE)
+#         if m:
+#             return m.group(1)
+
+#     return None
+
+
+# def extract_fields(text: str) -> dict:
+#     return {
+#         "merchant_name": extract_merchant_name(text),
+#         "invoice_number": extract_invoice_number(text),
+#         "date": extract_date(text),
+#         "total_amount": extract_total_amount(text),
+
+#         # optional fields
+#         "currency": None,
+#         "tax_amount": extract_tax_amount(text),
+#         "subtotal": extract_subtotal(text),
+#         "discount": extract_discount(text),
+#         "cash_tendered": extract_cash_tendered(text),
+#         "change": extract_change(text),
+#     }
+
 import re
+from dataclasses import dataclass
 
 
-def extract_merchant_name(text: str):
-    lines = [l.strip() for l in text.split("\n") if l.strip()]
-
-    skip_words = {
-        "invoice", "receipt", "tax", "bill", "order", "cash", "total",
-        "date", "tel", "phone", "www", "http"
-    }
-
-    for line in lines[:8]:
-        if len(line) < 3:
-            continue
-        if any(char.isdigit() for char in line) and len(line) < 6:
-            continue
-
-        low = line.lower()
-        if any(w in low for w in skip_words):
-            continue
-
-        return line
-
-    return None
+@dataclass
+class ExtractedData:
+    fields: dict
 
 
-def extract_invoice_number(text: str):
-    patterns = [
-        r"Invoice\s*#\s*([A-Za-z0-9\-_/]+)",
-        r"Invoice\s*No\.?\s*[:\-]?\s*([A-Za-z0-9\-_/]+)",
-        r"INVOICE\s*NO\.?\s*[:\-]?\s*([A-Za-z0-9\-_/]+)",
-        r"Document\s*(?:No|Number)\s*[:\-]?\s*([A-Za-z0-9\-_/]+)",
-        r"INV\s*#?\s*([A-Za-z0-9\-_/]+)",
-    ]
+class FieldExtractor:
+    def __init__(self):
+        self.skip_words = {
+            "invoice", "receipt", "tax", "bill", "order", "cash", "total",
+            "date", "tel", "phone", "www", "http"
+        }
 
-    for p in patterns:
-        match = re.search(p, text, re.IGNORECASE)
-        if match:
-            val = match.group(1).strip()
-            val = re.split(r"\s|\n|\|", val)[0]
-            return val
+    def extract(self, text: str) -> ExtractedData:
+        return ExtractedData(
+            fields={
+                "merchant_name": self._merchant(text),
+                "invoice_number": self._invoice(text),
+                "date": self._date(text),
+                "total_amount": self._total(text),
 
-    return None
+                "currency": None,
+                "tax_amount": self._tax(text),
+                "subtotal": self._subtotal(text),
+                "discount": self._discount(text),
+                "cash_tendered": self._cash(text),
+                "change": self._change(text),
+            }
+        )
 
+    def _merchant(self, text: str):
+        lines = [l.strip() for l in text.split("\n") if l.strip()]
 
-def extract_date(text: str):
-    labeled_patterns = [
-        r"Date\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
-        r"Invoice\s*Date\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
-        r"Date\s*[:\-]?\s*([A-Za-z]{3,9}\s*\d{1,2},?\s*\d{4})",
-        r"Invoice\s*Date\s*[:\-]?\s*([A-Za-z]{3,9}\s*\d{1,2},?\s*\d{4})",
-    ]
+        for line in lines[:8]:
+            if len(line) < 3:
+                continue
+            if any(char.isdigit() for char in line) and len(line) < 6:
+                continue
 
-    generic_patterns = [
-        r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
-        r"\b\d{1,2}-[A-Za-z]{3}-\d{2,4}\b",
-    ]
+            low = line.lower()
+            if any(w in low for w in self.skip_words):
+                continue
 
-    for p in labeled_patterns:
-        match = re.search(p, text, re.IGNORECASE)
-        if match:
-            return match.group(1)
+            return line
 
-    for p in generic_patterns:
-        match = re.search(p, text)
-        if match:
-            return match.group(0)
-
-    return None
-
-
-def extract_total_amount(text: str):
-    patterns = [
-        r"Grand\s*Total\s*[:\-]?\s*([\d,]+\.\d{2})",
-        r"Payable\s*[:\-]?\s*([\d,]+\.\d{2})",
-        r"Total\s*Amount\s*[:\-]?\s*([\d,]+\.\d{2})",
-        r"TOTAL\s*RM\s*([\d,]+\.\d{2})",
-        r"Total\s*[:\-]?\s*([\d,]+\.\d{2})",
-    ]
-
-    candidates = []
-
-    for p in patterns:
-        for m in re.finditer(p, text, re.IGNORECASE):
-            val = m.group(1).replace(",", "")
-            try:
-                candidates.append(float(val))
-            except:
-                pass
-
-    if not candidates:
         return None
 
-    return f"{max(candidates):.2f}"
+    def _invoice(self, text: str):
+        patterns = [
+            r"Invoice\s*#\s*([A-Za-z0-9\-_/]+)",
+            r"Invoice\s*No\.?\s*[:\-]?\s*([A-Za-z0-9\-_/]+)",
+            r"INVOICE\s*NO\.?\s*[:\-]?\s*([A-Za-z0-9\-_/]+)",
+            r"Document\s*(?:No|Number)\s*[:\-]?\s*([A-Za-z0-9\-_/]+)",
+            r"INV\s*#?\s*([A-Za-z0-9\-_/]+)",
+        ]
 
+        for p in patterns:
+            m = re.search(p, text, re.IGNORECASE)
+            if m:
+                val = m.group(1).strip()
+                return re.split(r"\s|\n|\|", val)[0]
+        return None
 
-# OPTIONAL FIELDS (light extraction only)
+    def _date(self, text: str):
+        patterns = [
+            r"Date\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+            r"Invoice\s*Date\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+            r"Date\s*[:\-]?\s*([A-Za-z]{3,9}\s*\d{1,2},?\s*\d{4})",
+            r"Invoice\s*Date\s*[:\-]?\s*([A-Za-z]{3,9}\s*\d{1,2},?\s*\d{4})",
+            r"\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b",
+        ]
 
-def extract_tax_amount(text: str):
-    patterns = [
-        r"Tax\s*@\s*\d+%[:\-]?\s*([\d,]+\.\d{2})",
-        r"GST[:\-]?\s*([\d,]+\.\d{2})",
-        r"SST[:\-]?\s*([\d,]+\.\d{2})",
-        r"Sales\s*Tax[:\-]?\s*([\d,]+\.\d{2})",
-    ]
+        for p in patterns:
+            m = re.search(p, text)
+            if m:
+                return m.group(1) if m.groups() else m.group(0)
 
-    for p in patterns:
-        m = re.search(p, text, re.IGNORECASE)
-        if m:
-            return m.group(1)
+        return None
 
-    return None
+    def _total(self, text: str):
+        patterns = [
+            r"Grand\s*Total\s*[:\-]?\s*([\d,]+\.\d{2})",
+            r"Payable\s*[:\-]?\s*([\d,]+\.\d{2})",
+            r"Total\s*Amount\s*[:\-]?\s*([\d,]+\.\d{2})",
+            r"TOTAL\s*RM\s*([\d,]+\.\d{2})",
+            r"Total\s*[:\-]?\s*([\d,]+\.\d{2})",
+        ]
 
+        values = []
+        for p in patterns:
+            for m in re.finditer(p, text, re.IGNORECASE):
+                try:
+                    values.append(float(m.group(1).replace(",", "")))
+                except:
+                    pass
 
-def extract_subtotal(text: str):
-    patterns = [
-        r"Sub\s*Total[:\-]?\s*([\d,]+\.\d{2})",
-        r"Subtotal[:\-]?\s*([\d,]+\.\d{2})",
-    ]
+        return f"{max(values):.2f}" if values else None
 
-    for p in patterns:
-        m = re.search(p, text, re.IGNORECASE)
-        if m:
-            return m.group(1)
+    def _tax(self, text: str):
+        return self._simple(text, [
+            r"Tax\s*@\s*\d+%[:\-]?\s*([\d,]+\.\d{2})",
+            r"GST[:\-]?\s*([\d,]+\.\d{2})",
+            r"SST[:\-]?\s*([\d,]+\.\d{2})",
+            r"Sales\s*Tax[:\-]?\s*([\d,]+\.\d{2})",
+        ])
 
-    return None
+    def _subtotal(self, text: str):
+        return self._simple(text, [
+            r"Sub\s*Total[:\-]?\s*([\d,]+\.\d{2})",
+            r"Subtotal[:\-]?\s*([\d,]+\.\d{2})",
+        ])
 
+    def _discount(self, text: str):
+        return self._simple(text, [r"Discount[:\-]?\s*([\d,]+\.\d{2})"])
 
-def extract_discount(text: str):
-    patterns = [
-        r"Discount[:\-]?\s*([\d,]+\.\d{2})",
-    ]
+    def _cash(self, text: str):
+        return self._simple(text, [
+            r"Cash\s*Tendered[:\-]?\s*([\d,]+\.\d{2})",
+            r"CASH[:\-]?\s*([\d,]+\.\d{2})",
+        ])
 
-    for p in patterns:
-        m = re.search(p, text, re.IGNORECASE)
-        if m:
-            return m.group(1)
+    def _change(self, text: str):
+        return self._simple(text, [r"Change[:\-]?\s*([\d,]+\.\d{2})"])
 
-    return None
-
-
-def extract_cash_tendered(text: str):
-    patterns = [
-        r"Cash\s*Tendered[:\-]?\s*([\d,]+\.\d{2})",
-        r"CASH[:\-]?\s*([\d,]+\.\d{2})",
-    ]
-
-    for p in patterns:
-        m = re.search(p, text, re.IGNORECASE)
-        if m:
-            return m.group(1)
-
-    return None
-
-
-def extract_change(text: str):
-    patterns = [
-        r"Change[:\-]?\s*([\d,]+\.\d{2})",
-    ]
-
-    for p in patterns:
-        m = re.search(p, text, re.IGNORECASE)
-        if m:
-            return m.group(1)
-
-    return None
-
-
-def extract_fields(text: str) -> dict:
-    return {
-        "merchant_name": extract_merchant_name(text),
-        "invoice_number": extract_invoice_number(text),
-        "date": extract_date(text),
-        "total_amount": extract_total_amount(text),
-
-        # optional fields
-        "currency": None,
-        "tax_amount": extract_tax_amount(text),
-        "subtotal": extract_subtotal(text),
-        "discount": extract_discount(text),
-        "cash_tendered": extract_cash_tendered(text),
-        "change": extract_change(text),
-    }
+    def _simple(self, text: str, patterns):
+        for p in patterns:
+            m = re.search(p, text, re.IGNORECASE)
+            if m:
+                return m.group(1)
+        return None
+    

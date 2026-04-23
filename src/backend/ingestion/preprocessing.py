@@ -46,8 +46,60 @@ class Preprocessing:
     def denoise_image(self, image: np.ndarray) -> np.ndarray:
         return cv2.GaussianBlur(image, (5, 5), 0)
 
-    def preprocess_document(self, pdf_path: str) -> list[PreprocessedPage]:
-        images = self.convert_pdf_to_images(pdf_path)
+    # def preprocess_document(self, pdf_path: str) -> list[PreprocessedPage]:
+    #     images = self.convert_pdf_to_images(pdf_path)
+    #     pages = []
+
+    #     for i, img in enumerate(images):
+
+    #         logger.info("RAW PAGE %s SHAPE: %s", i + 1, img.shape)
+    #         logger.info("RAW PAGE %s MIN/MAX: %s / %s", i + 1, img.min(), img.max())
+
+    #         gray = self.to_grayscale(img)
+    #         logger.info("GRAY PAGE %s SHAPE: %s", i + 1, gray.shape)
+
+    #         denoised = self.denoise_image(gray)
+    #         logger.info("DENOISED PAGE %s SHAPE: %s", i + 1, denoised.shape)
+
+    #         deskewed = self.deskew_image(denoised)
+    #         cv2.imwrite(f"/tmp/preprocessed_page_{i+1}.png", deskewed)
+    #         logger.info("FINAL PAGE %s SHAPE: %s", i + 1, deskewed.shape)
+
+    #         logger.info("FINAL PAGE %s MIN/MAX: %s / %s", i + 1, deskewed.min(), deskewed.max())
+
+    #         pages.append(
+    #             PreprocessedPage(
+    #                 page_number=i + 1,
+    #                 original=img,
+    #                 processed=deskewed,
+    #             )
+    #         )
+
+    #     logger.info("PREPROCESS DONE: %s pages", len(pages))
+    #     logger.info("PREPROCESS SAMPLE SHAPE: %s", pages[0].processed.shape)
+    #     logger.info(
+    #         "PREPROCESS SAMPLE TYPE: %s MIN/MAX: %s %s",
+    #         pages[0].processed.dtype,
+    #         pages[0].processed.min(),
+    #         pages[0].processed.max()
+    #     )
+    #     return pages
+
+    def preprocess_document(self, file_path: str) -> list[PreprocessedPage]:
+        ext = file_path.lower().split(".")[-1]
+
+        if ext == "pdf":
+            images = self.convert_pdf_to_images(file_path)
+        else:
+            img = cv2.imread(file_path)
+
+            if img is None:
+                raise ValueError(f"Cannot read image: {file_path}")
+
+            # normalize to RGB so pipeline matches PDF output style
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            images = [img]
+
         pages = []
 
         for i, img in enumerate(images):
@@ -62,9 +114,9 @@ class Preprocessing:
             logger.info("DENOISED PAGE %s SHAPE: %s", i + 1, denoised.shape)
 
             deskewed = self.deskew_image(denoised)
+
             cv2.imwrite(f"/tmp/preprocessed_page_{i+1}.png", deskewed)
             logger.info("FINAL PAGE %s SHAPE: %s", i + 1, deskewed.shape)
-
             logger.info("FINAL PAGE %s MIN/MAX: %s / %s", i + 1, deskewed.min(), deskewed.max())
 
             pages.append(
@@ -83,4 +135,5 @@ class Preprocessing:
             pages[0].processed.min(),
             pages[0].processed.max()
         )
+
         return pages

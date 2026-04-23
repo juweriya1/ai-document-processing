@@ -5,7 +5,6 @@ from datetime import datetime
 from backend.ai.ocr import run_ocr
 from backend.ai.extract import extract_fields
 
-
 DATASETS = [
     "src/backend/ai/data/local_receipts",
     "src/backend/ai/data/sroie_receipts",
@@ -36,21 +35,21 @@ def save_result(result: dict):
     with open(OUTPUT_FILE, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-
 def run_single():
-    # today: only one file exists, so this is safe
-    files = list(SAMPLES_DIR.glob("*"))
+    for dataset in DATASETS:
+        path = Path(dataset)
 
-    if not files:
-        raise ValueError("No sample files found")
+        if not path.exists():
+            raise ValueError(f"Dataset not found: {dataset}")
 
-    file_path = str(files[0])
+        for file_path in path.iterdir():
+            if not file_path.is_file():
+                continue
 
-    result = process_document(file_path)
-
-    print(result)
-    save_result(result)
-
+            result = process_document(str(file_path))
+            print(result)
+            save_result(result)
 
 if __name__ == "__main__":
     run_single()
+

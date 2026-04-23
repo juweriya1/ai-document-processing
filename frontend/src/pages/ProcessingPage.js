@@ -1,266 +1,301 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { processDocument, getDocumentStatus } from '../api/client';
-import { useToast } from '../components/Toast';
+import React, { useState, useEffect, useRef } from 'react';
+import { processingAPI, documentsAPI } from '../services/api';
+import PageHeader from '../components/shared/PageHeader';
+import toast from 'react-hot-toast';
 import './ProcessingPage.css';
 
-const STEPS = [
+const PIPELINE_STAGES = [
+  { id: 'ingest', name: 'Ingestion', desc: 'Secure document intake and format detection', icon: '📥' },
+  { id: 'preprocess', name: 'Pre-process', desc: 'Image normalization, deskewing, denoising', icon: '🔧' },
+  { id: 'ocr', name: 'OCR', desc: 'Character recognition with confidence scoring', icon: '👁️' },
+  { id: 'extract', name: 'Extraction', desc: 'NLP field identification and classification', icon: '🧠' },
+  { id: 'validate', name: 'Validation', desc: 'Rule-based checks and anomaly detection', icon: '✅' },
+  { id: 'output', name: 'Output', desc: 'Structured data export and routing', icon: '📤' },
+];
+
+const MOCK_JOBS = [
   {
-    key: 'preprocessing',
-    name: 'Preprocessing',
-    desc: 'Image cleanup, deskewing, noise removal and quality enhancement',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-        <rect x="2" y="2" width="16" height="16" rx="3" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M6 10h8M10 6v8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      </svg>
-    ),
+    id: 'JOB-0892', doc: 'Q4_Invoice_Batch.pdf', status: 'completed',
+    stages: { ingest: 'done', preprocess: 'done', ocr: 'done', extract: 'done', validate: 'done', output: 'done' },
+    confidence: 98, pages: 12, started: '2 min ago', duration: '14.2s',
+    logs: [
+      { time: '14:23:01', level: 'info', msg: 'Document ingested (12 pages, 4.2MB)' },
+      { time: '14:23:02', level: 'info', msg: 'Pre-processing complete — deskew applied to 3 pages' },
+      { time: '14:23:05', level: 'info', msg: 'OCR completed — 99.1% character confidence' },
+      { time: '14:23:09', level: 'info', msg: 'Extracted 47 fields across 12 invoices' },
+      { time: '14:23:12', level: 'info', msg: 'Validation passed — all rules satisfied' },
+      { time: '14:23:14', level: 'success', msg: 'Pipeline complete — ready for review' },
+    ],
   },
   {
-    key: 'extracting',
-    name: 'OCR & Field Extraction',
-    desc: 'Text extraction via OCR engine + entity recognition using VLM',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-        <path d="M5 3h7l4 4v10a1 1 0 01-1 1H5a1 1 0 01-1-1V4a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M7 9h6M7 12h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      </svg>
-    ),
+    id: 'JOB-0891', doc: 'ServiceAgreement_v3.pdf', status: 'review',
+    stages: { ingest: 'done', preprocess: 'done', ocr: 'done', extract: 'done', validate: 'warn', output: 'pending' },
+    confidence: 82, pages: 8, started: '11 min ago', duration: '9.8s',
+    logs: [
+      { time: '14:12:10', level: 'info', msg: 'Document ingested (8 pages, 1.9MB)' },
+      { time: '14:12:12', level: 'warn', msg: 'Scan quality low on pages 3, 7 — enhancement applied' },
+      { time: '14:12:16', level: 'info', msg: 'OCR completed — 87.4% character confidence' },
+      { time: '14:12:19', level: 'warn', msg: 'Party name ambiguous — manual review flagged' },
+      { time: '14:12:20', level: 'warn', msg: 'Validation warning: 2 low-confidence fields' },
+    ],
   },
   {
-    key: 'validating',
-    name: 'Schema Validation',
-    desc: 'Structured field validation against document schema rules',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-        <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M6.5 10l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
-    ),
+    id: 'JOB-0890', doc: 'EmployeeRecords_Oct.pdf', status: 'processing',
+    stages: { ingest: 'done', preprocess: 'done', ocr: 'active', extract: 'pending', validate: 'pending', output: 'pending' },
+    confidence: null, pages: 34, started: '18 min ago', duration: null,
+    logs: [
+      { time: '14:05:20', level: 'info', msg: 'Document ingested (34 pages, 8.7MB)' },
+      { time: '14:05:23', level: 'info', msg: 'Pre-processing complete' },
+      { time: '14:05:25', level: 'info', msg: 'OCR in progress — page 12/34…' },
+    ],
   },
   {
-    key: 'review_pending',
-    name: 'Ready for Review',
-    desc: 'Processing complete — awaiting human-in-the-loop review',
-    icon: (
-      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-        <circle cx="10" cy="8" r="4" stroke="currentColor" strokeWidth="1.5"/>
-        <path d="M3 18c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-      </svg>
-    ),
+    id: 'JOB-0888', doc: 'TaxForms_2024.pdf', status: 'error',
+    stages: { ingest: 'done', preprocess: 'error', ocr: 'pending', extract: 'pending', validate: 'pending', output: 'pending' },
+    confidence: null, pages: 6, started: '1 hr ago', duration: '3.1s',
+    logs: [
+      { time: '13:24:01', level: 'info', msg: 'Document ingested (6 pages, 2.1MB)' },
+      { time: '13:24:04', level: 'error', msg: 'Pre-processing failed: encrypted PDF (password protected)' },
+    ],
   },
 ];
 
-const ORDER = ['preprocessing', 'extracting', 'validating', 'review_pending'];
+const STATUS_MAP = {
+  completed:  { label: 'Completed',  cls: 'badge-success' },
+  review:     { label: 'Needs Review', cls: 'badge-warn' },
+  processing: { label: 'Processing',  cls: 'badge-info' },
+  error:      { label: 'Error',       cls: 'badge-danger' },
+};
 
-function stepStatus(key, current) {
-  const ci = ORDER.indexOf(current);
-  const ki = ORDER.indexOf(key);
-  if (ci < 0) return 'pending';
-  if (ki < ci) return 'done';
-  if (ki === ci) return 'active';
-  return 'pending';
-}
+const STAGE_MAP = {
+  done:    { cls: 'stage--done',    icon: '✓' },
+  active:  { cls: 'stage--active',  icon: '⟳' },
+  pending: { cls: 'stage--pending', icon: '○' },
+  warn:    { cls: 'stage--warn',    icon: '!' },
+  error:   { cls: 'stage--error',   icon: '✗' },
+};
 
-const CheckIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-    <path d="M4 10l4.5 4.5 7.5-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
-const SpinnerSmall = () => (
-  <div className="spinner" style={{ width: 14, height: 14, borderWidth: 2 }} />
-);
+const LOG_LEVEL_CLS = { info: '', warn: 'log--warn', error: 'log--error', success: 'log--success' };
 
 export default function ProcessingPage() {
-  const { documentId: paramId } = useParams();
-  const navigate                = useNavigate();
-  const toast                   = useToast();
-
-  const [docId, setDocId]         = useState(paramId || '');
-  const [processing, setProcessing] = useState(false);
-  const [docStatus, setDocStatus] = useState(null);
-  const [error, setError]         = useState(null);
+  const [jobs, setJobs] = useState(MOCK_JOBS);
+  const [selected, setSelected] = useState(MOCK_JOBS[0]);
+  const [loading, setLoading] = useState(false);
+  const logRef = useRef(null);
 
   useEffect(() => {
-    if (paramId) {
-      setDocId(paramId);
-      // Auto-load status on arrival
-      getDocumentStatus(paramId)
-        .then(d => setDocStatus(d))
-        .catch(() => {});
-    }
-  }, [paramId]);
+    processingAPI.list()
+      .then((res) => {
+        if (res.data?.jobs?.length) {
+          setJobs(res.data.jobs);
+          setSelected(res.data.jobs[0]);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
-  const handleProcess = async () => {
-    if (!docId.trim()) { toast('Please enter a document ID', 'error'); return; }
-    setProcessing(true);
-    setError(null);
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [selected]);
+
+  const handleRetry = async (jobId) => {
     try {
-      const result = await processDocument(docId.trim());
-      setDocStatus({
-        document_id:           result.document_id,
-        status:                result.status,
-        fields_extracted:      result.fields_extracted,
-        line_items_extracted:  result.line_items_extracted,
-      });
-      toast(`Processing complete — ${result.fields_extracted} fields extracted`, 'success');
-    } catch (err) {
-      setError(err.message);
-      toast(err.message, 'error');
-    } finally {
-      setProcessing(false);
+      await processingAPI.retry(jobId);
+      toast.success('Job queued for retry', { className: 'custom-toast' });
+    } catch {
+      toast.error('Retry failed', { className: 'custom-toast' });
     }
   };
 
-  const handleCheckStatus = async () => {
-    if (!docId.trim()) { toast('Please enter a document ID', 'error'); return; }
+  const handleCancel = async (jobId) => {
     try {
-      const result = await getDocumentStatus(docId.trim());
-      setDocStatus(result);
-      setError(null);
-    } catch (err) {
-      setError(err.message);
-      toast(err.message, 'error');
+      await processingAPI.cancel(jobId);
+      toast.success('Job cancelled', { className: 'custom-toast' });
+    } catch {
+      toast.error('Cancel failed', { className: 'custom-toast' });
     }
   };
-
-  const current = docStatus?.status || '';
-  const isTerminal = ['review_pending','approved','rejected','failed'].includes(current);
 
   return (
-    <div className="page-wrap">
-      <div className="page-header">
-        <h1 className="page-title">Document Processing</h1>
-        <p className="page-subtitle">Run the AI pipeline on your uploaded document</p>
-      </div>
+    <div className="page-enter">
+      <PageHeader
+        title="Processing Pipeline"
+        subtitle="Monitor AI processing jobs and pipeline stage execution"
+        badge={{ text: `${jobs.filter(j => j.status === 'processing').length} Active`, type: 'info' }}
+        actions={
+          <button className="btn btn-secondary btn-sm">Filter jobs</button>
+        }
+      />
 
-      {/* Input row */}
-      <div className="processing__search-row">
-        <div style={{ flex: 1 }}>
-          <label className="form-label">Document ID</label>
-          <input
-            className="form-input"
-            type="text"
-            value={docId}
-            onChange={(e) => setDocId(e.target.value)}
-            placeholder="Enter document UUID…"
-          />
-        </div>
-        <button className="btn btn--primary" onClick={handleProcess} disabled={processing}>
-          {processing
-            ? <><SpinnerSmall /> Processing…</>
-            : <>
-                <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M10 4v8M6 8l4-4 4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="10" cy="14" r="2" stroke="currentColor" strokeWidth="1.5"/></svg>
-                Process
-              </>
-          }
-        </button>
-        <button className="btn btn--secondary" onClick={handleCheckStatus}>
-          Check Status
-        </button>
-      </div>
-
-      {/* Error */}
-      {error && (
-        <div className="processing__error">
-          <svg width="16" height="16" viewBox="0 0 20 20" fill="none" style={{flexShrink:0}}>
-            <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/>
-            <path d="M10 6v5M10 14v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-          {error}
-        </div>
-      )}
-
-      {/* Document status card */}
-      {docStatus && (
-        <div className="processing__status-card">
-          <div className="processing__doc-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8L14 2z" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5"/>
-            </svg>
+      <div className="processing-layout">
+        {/* Jobs sidebar */}
+        <div className="jobs-panel">
+          <div className="jobs-panel-header">
+            <span className="section-title">All Jobs</span>
+            <span className="job-count">{jobs.length}</span>
           </div>
-          <div style={{ flex: 1 }}>
-            <div className="processing__doc-name">
-              {docStatus.filename || `Document ${docStatus.document_id?.slice(0, 8)}…`}
-            </div>
-            <div className="processing__doc-meta">
-              ID: {docStatus.document_id}
-              {docStatus.fields_extracted != null && ` · ${docStatus.fields_extracted} fields`}
-              {docStatus.line_items_extracted != null && ` · ${docStatus.line_items_extracted} line items`}
-            </div>
-          </div>
-          <span className={`badge ${
-            current === 'approved'      ? 'badge--success' :
-            current === 'rejected'      ? 'badge--error'   :
-            current === 'review_pending'? 'badge--accent'  :
-            current === 'failed'        ? 'badge--error'   :
-            'badge--warning'
-          }`}>
-            {current.replace(/_/g,' ')}
-          </span>
-        </div>
-      )}
-
-      {/* Pipeline steps */}
-      <div className="card" style={{ marginBottom: 'var(--sp-6)' }}>
-        <div className="card-title">Processing Pipeline</div>
-        <div className="pipeline">
-          {STEPS.map((step, idx) => {
-            const status = docStatus ? stepStatus(step.key, current) : 'pending';
-            return (
-              <div
-                className={`pipeline__step pipeline__step--${status} animate-slide-up`}
-                key={step.key}
-                style={{ animationDelay: `${idx * 80}ms` }}
+          <div className="jobs-panel-list">
+            {jobs.map((job) => (
+              <button
+                key={job.id}
+                className={`job-card ${selected?.id === job.id ? 'job-card--selected' : ''}`}
+                onClick={() => setSelected(job)}
               >
-                <div className="pipeline__icon">
-                  {status === 'done'   ? <CheckIcon /> :
-                   status === 'active' && processing ? <SpinnerSmall /> :
-                   step.icon}
+                <div className="job-card-top">
+                  <span className="job-card-id mono">{job.id}</span>
+                  <span className={`badge ${STATUS_MAP[job.status]?.cls}`}>
+                    {job.status === 'processing' && <span className="pulse-dot active" style={{ width: 6, height: 6 }} />}
+                    {STATUS_MAP[job.status]?.label}
+                  </span>
                 </div>
-                <div className="pipeline__body">
-                  <div className="pipeline__step-header">
-                    <span className="pipeline__step-name">{step.name}</span>
-                    <span className="pipeline__step-status">
-                      {status === 'done'   ? '✓ Complete' :
-                       status === 'active' ? (processing ? 'Running…' : 'Current') :
-                       'Pending'}
+                <div className="job-card-doc">{job.doc}</div>
+                <div className="job-card-meta">
+                  <span>{job.pages} pages</span>
+                  <span>·</span>
+                  <span>{job.started}</span>
+                  {job.duration && <><span>·</span><span>{job.duration}</span></>}
+                </div>
+                {job.confidence !== null && (
+                  <div className="confidence-bar" style={{ marginTop: 6 }}>
+                    <div className="confidence-track">
+                      <div
+                        className={`confidence-fill ${job.confidence >= 90 ? 'high' : job.confidence >= 75 ? 'medium' : 'low'}`}
+                        style={{ width: `${job.confidence}%` }}
+                      />
+                    </div>
+                    <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                      {job.confidence}%
                     </span>
                   </div>
-                  <div className="pipeline__step-desc">{step.desc}</div>
-                  {status === 'active' && (
-                    <div className="pipeline__progress-bar">
-                      <div className={`pipeline__progress-fill${processing ? '' : ' pipeline__progress-fill--done'}`}
-                        style={!processing ? { width: '100%', animation: 'none', background: 'var(--accent)' } : {}} />
-                    </div>
-                  )}
-                  {status === 'done' && (
-                    <div className="pipeline__progress-bar">
-                      <div className="pipeline__progress-fill pipeline__progress-fill--done" style={{ width: '100%' }} />
-                    </div>
-                  )}
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Detail panel */}
+        {selected && (
+          <div className="job-detail">
+            {/* Header */}
+            <div className="job-detail-header">
+              <div>
+                <div className="flex items-center gap-3">
+                  <h2 className="job-detail-title">{selected.doc}</h2>
+                  <span className={`badge ${STATUS_MAP[selected.status]?.cls}`}>
+                    {STATUS_MAP[selected.status]?.label}
+                  </span>
+                </div>
+                <div className="job-detail-meta mono">
+                  {selected.id} · {selected.pages} pages ·{' '}
+                  Started {selected.started}
+                  {selected.duration && ` · Completed in ${selected.duration}`}
                 </div>
               </div>
-            );
-          })}
-        </div>
-      </div>
+              <div className="flex gap-2">
+                {selected.status === 'error' && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => handleRetry(selected.id)}>
+                    Retry
+                  </button>
+                )}
+                {selected.status === 'processing' && (
+                  <button className="btn btn-danger btn-sm" onClick={() => handleCancel(selected.id)}>
+                    Cancel
+                  </button>
+                )}
+                {selected.status === 'review' && (
+                  <a href="/review" className="btn btn-primary btn-sm">
+                    Open Review →
+                  </a>
+                )}
+              </div>
+            </div>
 
-      {/* Nav actions when ready */}
-      {isTerminal && (
-        <div className="processing__nav">
-          <button className="btn btn--primary" onClick={() => navigate(`/validation/${docStatus.document_id}`)}>
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M10 2l2 5.5H18l-4.9 3.6 1.9 5.6L10 13.3l-5 3.4 1.9-5.6L2 7.5h6L10 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/></svg>
-            Validate Fields
-          </button>
-          <button className="btn btn--secondary" onClick={() => navigate(`/review/${docStatus.document_id}`)}>
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><path d="M10 4C6 4 2.7 7.6 2 10c.7 2.4 4 6 8 6s7.3-3.6 8-6c-.7-2.4-4-6-8-6z" stroke="currentColor" strokeWidth="1.5"/><circle cx="10" cy="10" r="2.5" stroke="currentColor" strokeWidth="1.5"/></svg>
-            Review Document
-          </button>
-        </div>
-      )}
+            {/* Pipeline stages */}
+            <div className="pipeline-viz">
+              <div className="pipeline-stages-row">
+                {PIPELINE_STAGES.map((stage, i) => {
+                  const stageStatus = selected.stages[stage.id] || 'pending';
+                  const sm = STAGE_MAP[stageStatus];
+                  return (
+                    <React.Fragment key={stage.id}>
+                      <div className={`pipeline-stage-node ${sm.cls}`}>
+                        <div className="stage-indicator">
+                          <span className={`stage-icon ${stageStatus === 'active' ? 'stage-spin' : ''}`}>
+                            {sm.icon}
+                          </span>
+                        </div>
+                        <div className="stage-label">
+                          <span className="stage-name">{stage.name}</span>
+                          <span className="stage-desc">{stage.desc}</span>
+                        </div>
+                      </div>
+                      {i < PIPELINE_STAGES.length - 1 && (
+                        <div className={`pipeline-connector ${stageStatus === 'done' ? 'pipeline-connector--done' : ''}`} />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Stats bar */}
+            {selected.confidence !== null && (
+              <div className="job-stats-bar">
+                <div className="job-stat">
+                  <span className="job-stat-label">Confidence</span>
+                  <div className="job-stat-conf">
+                    <div className="confidence-track" style={{ flex: 1 }}>
+                      <div
+                        className={`confidence-fill ${selected.confidence >= 90 ? 'high' : selected.confidence >= 75 ? 'medium' : 'low'}`}
+                        style={{ width: `${selected.confidence}%` }}
+                      />
+                    </div>
+                    <span className="mono" style={{ fontSize: '0.85rem' }}>{selected.confidence}%</span>
+                  </div>
+                </div>
+                <div className="job-stat-divider" />
+                <div className="job-stat">
+                  <span className="job-stat-label">Pages</span>
+                  <span className="job-stat-val">{selected.pages}</span>
+                </div>
+                <div className="job-stat-divider" />
+                <div className="job-stat">
+                  <span className="job-stat-label">Duration</span>
+                  <span className="job-stat-val">{selected.duration || '—'}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Log rail */}
+            <div className="log-rail">
+              <div className="log-rail-header">
+                <span className="section-title">Execution Log</span>
+                <span className="log-count mono">{selected.logs?.length} events</span>
+              </div>
+              <div className="log-entries" ref={logRef}>
+                {selected.logs?.map((log, i) => (
+                  <div key={i} className={`log-entry ${LOG_LEVEL_CLS[log.level]}`}>
+                    <span className="log-time mono">{log.time}</span>
+                    <span className={`log-level-tag ${log.level}`}>{log.level}</span>
+                    <span className="log-msg">{log.msg}</span>
+                  </div>
+                ))}
+                {selected.status === 'processing' && (
+                  <div className="log-entry log-entry--streaming">
+                    <span className="log-time mono">—</span>
+                    <span className="log-level-tag info">info</span>
+                    <span className="log-msg">
+                      <span className="log-cursor" />
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

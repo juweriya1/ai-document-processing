@@ -1,145 +1,79 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { ToastProvider } from './components/Toast';
-import Sidebar from './components/Sidebar';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { AuthProvider } from './hooks/useAuth';
 import ProtectedRoute from './components/ProtectedRoute';
+import AppLayout from './components/layout/AppLayout';
+
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import UploadPage from './pages/UploadPage';
 import ProcessingPage from './pages/ProcessingPage';
 import ValidationPage from './pages/ValidationPage';
 import ReviewPage from './pages/ReviewPage';
 import InsightsPage from './pages/InsightsPage';
-import AdminPage from './pages/AdminPage';
-import './App.css';
+import SettingsPage from './pages/SettingsPage';
+import NotFoundPage from './pages/NotFoundPage';
 
-function AppLoader() {
+import './styles/globals.css';
+
+function AuthenticatedLayout({ children }) {
   return (
-    <div className="app-loader">
-      <div className="app-loader__logo">IDP Platform</div>
-      <div className="spinner" />
-    </div>
-  );
-}
-
-function AppLayout() {
-  const { isAuthenticated, isLoading } = useAuth();
-  const location = useLocation();
-
-  if (isLoading) return <AppLoader />;
-
-  if (!isAuthenticated) {
-    return (
-      <div className="app-login">
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
-      </div>
-    );
-  }
-
-  return (
-    <div className="app-shell">
-      <Sidebar />
-      <main className="app-shell__main">
-        <Routes>
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/upload"
-            element={
-              <ProtectedRoute>
-                <UploadPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/processing/:documentId"
-            element={
-              <ProtectedRoute>
-                <ProcessingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/processing"
-            element={
-              <ProtectedRoute>
-                <ProcessingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/validation/:documentId"
-            element={
-              <ProtectedRoute>
-                <ValidationPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/validation"
-            element={
-              <ProtectedRoute>
-                <ValidationPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/review/:documentId"
-            element={
-              <ProtectedRoute>
-                <ReviewPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/review"
-            element={
-              <ProtectedRoute>
-                <ReviewPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/insights"
-            element={
-              <ProtectedRoute>
-                <InsightsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute allowedRoles={['admin']}>
-                <AdminPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </main>
-    </div>
+    <ProtectedRoute>
+      <AppLayout>{children}</AppLayout>
+    </ProtectedRoute>
   );
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <AppLayout />
-        </ToastProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Toaster
+          position="bottom-right"
+          toastOptions={{ duration: 3500 }}
+        />
+        <Routes>
+          {/* Public */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+
+          {/* Authenticated */}
+          <Route
+            path="/dashboard"
+            element={<AuthenticatedLayout><DashboardPage /></AuthenticatedLayout>}
+          />
+          <Route
+            path="/upload"
+            element={<AuthenticatedLayout><UploadPage /></AuthenticatedLayout>}
+          />
+          <Route
+            path="/processing"
+            element={<AuthenticatedLayout><ProcessingPage /></AuthenticatedLayout>}
+          />
+          <Route
+            path="/validation"
+            element={<AuthenticatedLayout><ValidationPage /></AuthenticatedLayout>}
+          />
+          <Route
+            path="/review"
+            element={<AuthenticatedLayout><ReviewPage /></AuthenticatedLayout>}
+          />
+          <Route
+            path="/insights"
+            element={<AuthenticatedLayout><InsightsPage /></AuthenticatedLayout>}
+          />
+          <Route
+            path="/settings"
+            element={<AuthenticatedLayout><SettingsPage /></AuthenticatedLayout>}
+          />
+
+          {/* Redirects */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

@@ -1,8 +1,27 @@
-import { useState, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
+import { useDropzone } from 'react-dropzone';
 import { useNavigate } from 'react-router-dom';
-import { uploadDocument } from '../api/client';
-import { useToast } from '../components/Toast';
+import { documentsAPI } from '../services/api';
+import PageHeader from '../components/shared/PageHeader';
+import toast from 'react-hot-toast';
 import './UploadPage.css';
+
+const MAX_SIZE = 50 * 1024 * 1024; // 50MB
+const ACCEPTED = {
+  'application/pdf': ['.pdf'],
+  'image/png': ['.png'],
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/tiff': ['.tiff', '.tif'],
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+};
+
+const FILE_ICONS = {
+  'application/pdf': '📄',
+  'image/png': '🖼️',
+  'image/jpeg': '🖼️',
+  'image/tiff': '🖼️',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '📝',
+};
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -10,198 +29,277 @@ function formatSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function fileExt(name) {
-  return name?.split('.').pop()?.toUpperCase() || 'FILE';
-}
-
-const SUPPORTED = ['.pdf', '.png', '.jpg', '.jpeg', '.doc', '.docx'];
+const DOC_TYPE_HINTS = [
+  { icon: '🧾', label: 'Invoices', desc: 'PDF, JPEG, TIFF supported' },
+  { icon: '📋', label: 'Contracts', desc: 'PDF, DOCX supported' },
+  { icon: '📊', label: 'Reports', desc: 'PDF, DOCX supported' },
+  { icon: '📝', label: 'Forms', desc: 'PDF, PNG, TIFF supported' },
+];
 
 export default function UploadPage() {
-  const [file, setFile]             = useState(null);
-  const [dragActive, setDragActive] = useState(false);
-  const [uploading, setUploading]   = useState(false);
-  const [progress, setProgress]     = useState(0);
-  const [result, setResult]         = useState(null);
-  const inputRef                    = useRef(null);
-  const toast                       = useToast();
-  const navigate                    = useNavigate();
+  const navigate = useNavigate();
+  const [files, setFiles] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const [docType, setDocType] = useState('auto');
 
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(e.type === 'dragenter' || e.type === 'dragover');
+  const onDrop = useCallback((accepted, rejected) => {
+    if (rejected.length) {
+      rejected.forEach((r) => {
+        const err = r.errors[0];
+        if (err.code === 'file-too-large') toast.error(`${r.file.name} exceeds 50MB limit`, { className: 'custom-toast' });
+        else toast.error(err.message, { className: 'custom-toast' });
+      });
+    }
+    setFiles((prev) => [
+      ...prev,
+      ...accepted.map((f) => ({
+        file: f,
+        id: `${Date.now()}-${Math.random()}`,
+        progress: 0,
+        status: 'queued', // queued | uploading | done | error
+        preview: f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
+      })),
+    ]);
+  }, []);
+
+  const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
+    onDrop,
+    accept: ACCEPTED,
+    maxSize: MAX_SIZE,
+    multiple: true,
+  });
+
+  const removeFile = (id) => {
+    setFiles((prev) => prev.filter((f) => f.id !== id));
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    const dropped = e.dataTransfer.files?.[0];
-    if (dropped) { setFile(dropped); setResult(null); }
-  };
-
-  const handleFileSelect = (e) => {
-    const selected = e.target.files?.[0];
-    if (selected) { setFile(selected); setResult(null); }
-  };
-
-  const handleUpload = async () => {
-    if (!file) return;
+  const uploadAll = async () => {
+    if (!files.length) return;
     setUploading(true);
-    setProgress(0);
 
-    // Simulate progress
-    const tick = setInterval(() => {
-      setProgress(p => Math.min(p + Math.random() * 18, 88));
-    }, 200);
+    const results = await Promise.allSettled(
+      files.filter((f) => f.status === 'queued').map(async (item) => {
+        setFiles((prev) =>
+          prev.map((f) => f.id === item.id ? { ...f, status: 'uploading' } : f)
+        );
+        const formData = new FormData();
+        formData.append('file', item.file);
+        formData.append('doc_type', docType);
 
-    try {
-      const data = await uploadDocument(file);
-      clearInterval(tick);
-      setProgress(100);
-      setTimeout(() => {
-        setResult(data);
-        setFile(null);
-        setProgress(0);
-        toast('Document uploaded successfully', 'success');
-      }, 300);
-    } catch (err) {
-      clearInterval(tick);
-      setProgress(0);
-      toast(err.message, 'error');
-    } finally {
-      setUploading(false);
+        try {
+          await documentsAPI.upload(formData, (pct) => {
+            setFiles((prev) =>
+              prev.map((f) => f.id === item.id ? { ...f, progress: pct } : f)
+            );
+          });
+          setFiles((prev) =>
+            prev.map((f) => f.id === item.id ? { ...f, status: 'done', progress: 100 } : f)
+          );
+        } catch (err) {
+          setFiles((prev) =>
+            prev.map((f) => f.id === item.id ? { ...f, status: 'error' } : f)
+          );
+          throw err;
+        }
+      })
+    );
+
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+
+    if (succeeded) toast.success(`${succeeded} document${succeeded > 1 ? 's' : ''} uploaded successfully`, { className: 'custom-toast' });
+    if (failed) toast.error(`${failed} upload${failed > 1 ? 's' : ''} failed`, { className: 'custom-toast' });
+
+    setUploading(false);
+    if (succeeded && !failed) {
+      setTimeout(() => navigate('/processing'), 1200);
     }
   };
 
-  const clearFile = () => {
-    setFile(null);
-    if (inputRef.current) inputRef.current.value = '';
-  };
+  const queuedCount = files.filter((f) => f.status === 'queued').length;
 
   return (
-    <div className="page-wrap">
-      <div className="page-header">
-        <h1 className="page-title">Upload Document</h1>
-        <p className="page-subtitle">
-          Upload invoices, contracts or any document for AI-powered extraction
-        </p>
+    <div className="page-enter">
+      <PageHeader
+        title="Document Upload"
+        subtitle="Ingest documents into the AI processing pipeline"
+        actions={
+          files.length > 0 && (
+            <div className="flex gap-3 items-center">
+              <span className="upload-file-count">{files.length} file{files.length > 1 ? 's' : ''} staged</span>
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => setFiles([])}
+                disabled={uploading}
+              >
+                Clear all
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={uploadAll}
+                disabled={uploading || queuedCount === 0}
+              >
+                {uploading ? (
+                  <><span className="btn-spinner" style={{ borderTopColor: '#080c18' }} />Processing…</>
+                ) : (
+                  <>Upload {queuedCount} file{queuedCount !== 1 ? 's' : ''}</>
+                )}
+              </button>
+            </div>
+          )
+        }
+      />
+
+      <div className="upload-content">
+        <div className="upload-main">
+          {/* Drop zone */}
+          <div
+            {...getRootProps()}
+            className={`dropzone ${isDragActive ? 'dropzone--active' : ''} ${isDragReject ? 'dropzone--reject' : ''}`}
+          >
+            <input {...getInputProps()} />
+            <div className="dropzone-inner">
+              <div className="dropzone-icon-wrap">
+                <svg width="36" height="36" viewBox="0 0 36 36" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M18 22V10M12 16l6-6 6 6" />
+                  <path d="M6 26v2a2 2 0 002 2h20a2 2 0 002-2v-2" />
+                </svg>
+              </div>
+              {isDragActive && !isDragReject ? (
+                <div className="dropzone-text">
+                  <h3>Release to add files</h3>
+                  <p>Drop your documents here</p>
+                </div>
+              ) : isDragReject ? (
+                <div className="dropzone-text dropzone-text--error">
+                  <h3>Unsupported file type</h3>
+                  <p>Please use PDF, PNG, JPEG, TIFF, or DOCX</p>
+                </div>
+              ) : (
+                <div className="dropzone-text">
+                  <h3>Drag & drop documents</h3>
+                  <p>or <span className="dropzone-browse">click to browse</span></p>
+                  <div className="dropzone-hints">
+                    <span className="tag">PDF</span>
+                    <span className="tag">PNG</span>
+                    <span className="tag">JPEG</span>
+                    <span className="tag">TIFF</span>
+                    <span className="tag">DOCX</span>
+                    <span className="tag">Max 50MB</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Document type selector */}
+          <div className="card doc-type-card">
+            <div className="doc-type-header">
+              <h4>Document Type</h4>
+              <p>Selecting the correct type improves extraction accuracy</p>
+            </div>
+            <div className="doc-type-grid">
+              <label className={`doc-type-option ${docType === 'auto' ? 'doc-type-option--active' : ''}`}>
+                <input type="radio" name="docType" value="auto" checked={docType === 'auto'} onChange={() => setDocType('auto')} />
+                <span className="doc-type-icon">🤖</span>
+                <span className="doc-type-label">Auto-detect</span>
+              </label>
+              {DOC_TYPE_HINTS.map((t) => (
+                <label
+                  key={t.label}
+                  className={`doc-type-option ${docType === t.label.toLowerCase() ? 'doc-type-option--active' : ''}`}
+                >
+                  <input
+                    type="radio"
+                    name="docType"
+                    value={t.label.toLowerCase()}
+                    checked={docType === t.label.toLowerCase()}
+                    onChange={() => setDocType(t.label.toLowerCase())}
+                  />
+                  <span className="doc-type-icon">{t.icon}</span>
+                  <span className="doc-type-label">{t.label}</span>
+                  <span className="doc-type-desc">{t.desc}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* File staging area */}
+          {files.length > 0 && (
+            <div className="staged-files">
+              <h4 className="staged-title">Staged Files</h4>
+              <div className="staged-list">
+                {files.map((item) => (
+                  <div key={item.id} className={`staged-item staged-item--${item.status}`}>
+                    <div className="staged-thumb">
+                      {item.preview ? (
+                        <img src={item.preview} alt="" />
+                      ) : (
+                        <span>{FILE_ICONS[item.file.type] || '📄'}</span>
+                      )}
+                    </div>
+                    <div className="staged-info">
+                      <span className="staged-name">{item.file.name}</span>
+                      <span className="staged-meta">
+                        {formatSize(item.file.size)}
+                        {item.file.type && <> · <span className="mono">{item.file.type.split('/')[1].toUpperCase()}</span></>}
+                      </span>
+                      {item.status === 'uploading' && (
+                        <div className="progress-bar staged-progress">
+                          <div className="progress-fill" style={{ width: `${item.progress}%` }} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="staged-status">
+                      {item.status === 'queued' && <span className="badge badge-default">Queued</span>}
+                      {item.status === 'uploading' && (
+                        <span className="badge badge-info">{item.progress}%</span>
+                      )}
+                      {item.status === 'done' && <span className="badge badge-success">✓ Done</span>}
+                      {item.status === 'error' && <span className="badge badge-danger">Failed</span>}
+                    </div>
+                    {item.status !== 'uploading' && item.status !== 'done' && (
+                      <button
+                        className="staged-remove"
+                        onClick={() => removeFile(item.id)}
+                        aria-label="Remove file"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {files.length === 0 && (
+            <div className="card upload-guidelines">
+              <h4>Processing Pipeline</h4>
+              <div className="pipeline-steps">
+                {[
+                  { step: '01', name: 'Upload', desc: 'Secure document ingestion' },
+                  { step: '02', name: 'Pre-process', desc: 'Deskewing, denoising, format normalization' },
+                  { step: '03', name: 'OCR', desc: 'Character recognition across 50+ languages' },
+                  { step: '04', name: 'Extract', desc: 'NLP-based field extraction & classification' },
+                  { step: '05', name: 'Validate', desc: 'Rule-based validation & confidence scoring' },
+                  { step: '06', name: 'Review', desc: 'Human-in-the-loop quality assurance' },
+                ].map((s, i) => (
+                  <div key={s.step} className="pipeline-step">
+                    <div className="pipeline-step-num mono">{s.step}</div>
+                    {i < 5 && <div className="pipeline-step-line" />}
+                    <div className="pipeline-step-body">
+                      <span className="pipeline-step-name">{s.name}</span>
+                      <span className="pipeline-step-desc">{s.desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-
-      {/* Drop zone */}
-      {!result && (
-        <div
-          className={`upload__dropzone${dragActive ? ' upload__dropzone--active' : ''}`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          onClick={() => !file && inputRef.current?.click()}
-        >
-          <svg className="upload__drop-icon" viewBox="0 0 64 64" fill="none">
-            <rect x="8" y="12" width="48" height="40" rx="6" stroke="currentColor" strokeWidth="2"/>
-            <path d="M32 42V26M32 26L24 33M32 26L40 33" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <div className="upload__drop-title">
-            {dragActive ? 'Drop to upload' : 'Drag & drop your document'}
-          </div>
-          <div className="upload__drop-desc">
-            Or click to browse. Max 50MB.
-          </div>
-          <div className="upload__drop-types">
-            {SUPPORTED.map(t => (
-              <span className="upload__type-tag" key={t}>{t}</span>
-            ))}
-          </div>
-          <input
-            ref={inputRef}
-            type="file"
-            accept={SUPPORTED.join(',')}
-            onChange={handleFileSelect}
-            style={{ display: 'none' }}
-          />
-        </div>
-      )}
-
-      {/* Selected file */}
-      {file && !uploading && !result && (
-        <div className="upload__file-card">
-          <div className="upload__file-icon-wrap">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8L14 2z" stroke="currentColor" strokeWidth="1.5"/>
-              <path d="M14 2v6h6M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <div className="upload__file-info">
-            <div className="upload__file-name">{file.name}</div>
-            <div className="upload__file-size">{formatSize(file.size)} · {fileExt(file.name)}</div>
-          </div>
-          <div className="upload__file-actions">
-            <button className="btn btn--ghost btn--sm" onClick={clearFile}>Remove</button>
-            <button className="btn btn--primary" onClick={handleUpload}>
-              <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><path d="M10 13V4M10 4L7 7M10 4L13 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3 13v2a2 2 0 002 2h10a2 2 0 002-2v-2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-              Upload
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Upload progress */}
-      {uploading && (
-        <div className="upload__progress">
-          <div className="upload__progress-label">
-            <span>Uploading {file?.name}…</span>
-            <span>{Math.round(progress)}%</span>
-          </div>
-          <div className="upload__progress-track">
-            <div className="upload__progress-fill" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-      )}
-
-      {/* Success result */}
-      {result && (
-        <div className="upload__result">
-          <div className="upload__result-header">
-            <div className="upload__result-icon">
-              <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-                <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M6.5 10l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <div>
-              <div className="upload__result-title">Upload successful</div>
-              <div className="upload__result-subtitle">Document is ready for processing</div>
-            </div>
-            <div style={{ marginLeft: 'auto' }}>
-              <span className="badge badge--success">Ready</span>
-            </div>
-          </div>
-
-          <div className="upload__result-grid">
-            <span className="upload__result-label">Document ID</span>
-            <span className="upload__result-value">{result.id}</span>
-            <span className="upload__result-label">Filename</span>
-            <span className="upload__result-value">{result.originalFilename}</span>
-            <span className="upload__result-label">Type</span>
-            <span className="upload__result-value">{result.fileType}</span>
-            <span className="upload__result-label">Size</span>
-            <span className="upload__result-value">{formatSize(result.fileSize)}</span>
-            <span className="upload__result-label">Status</span>
-            <span className="upload__result-value">{result.status}</span>
-          </div>
-
-          <div className="upload__result-actions">
-            <button className="btn btn--primary" onClick={() => navigate(`/processing/${result.id}`)}>
-              <svg width="15" height="15" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.5"/><path d="M10 6v4l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
-              Process Document
-            </button>
-            <button className="btn btn--secondary" onClick={() => setResult(null)}>
-              Upload Another
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -6,6 +6,8 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import UploadPage from './pages/UploadPage';
+import BatchUploadPage from './pages/BatchUploadPage';
+import BatchStatusPage from './pages/BatchStatusPage';
 import ProcessingPage from './pages/ProcessingPage';
 import ValidationPage from './pages/ValidationPage';
 import ReviewPage from './pages/ReviewPage';
@@ -32,6 +34,22 @@ function AppRoutes() {
           element={
             <ProtectedRoute>
               <div className="app__content"><UploadPage /></div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/batch-upload"
+          element={
+            <ProtectedRoute>
+              <div className="app__content"><BatchUploadPage /></div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/batches/:batchId"
+          element={
+            <ProtectedRoute>
+              <div className="app__content"><BatchStatusPage /></div>
             </ProtectedRoute>
           }
         />

@@ -75,9 +75,55 @@ export function getDocumentStatus(documentId) {
   return request(`/api/documents/${documentId}/status`);
 }
 
+// Batches
+export function uploadBatch(files) {
+  const formData = new FormData();
+  files.forEach((f) => formData.append('files', f));
+  return request('/api/batches/upload', {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export function getBatch(batchId) {
+  return request(`/api/batches/${batchId}`);
+}
+
+export function reprocessBatch(batchId) {
+  return request(`/api/batches/${batchId}/process`, {
+    method: 'POST',
+  });
+}
+
+export function listBatches(limit = 5) {
+  return request(`/api/batches?limit=${limit}`);
+}
+
 // Validation
-export function getDocumentFields(documentId) {
-  return request(`/api/documents/${documentId}/fields`);
+export function getDocumentFields(documentId, hitl = false) {
+  return request(`/api/documents/${documentId}/fields?hitl=${hitl}`);
+}
+
+export function getDocumentFieldsWithStats(documentId, hitl = false) {
+  // Returns { fields, total, shown, skipped } using the X-HITL-* headers
+  const token = localStorage.getItem('idp_token');
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  return fetch(`${API_URL}/api/documents/${documentId}/fields?hitl=${hitl}`, { headers })
+    .then(async (res) => {
+      if (!res.ok) throw new Error('Failed to load fields');
+      const fields = await res.json();
+      return {
+        fields,
+        total: parseInt(res.headers.get('X-HITL-Total-Fields') ?? fields.length, 10),
+        shown: parseInt(res.headers.get('X-HITL-Shown-Fields') ?? fields.length, 10),
+        skipped: parseInt(res.headers.get('X-HITL-Skipped-Fields') ?? 0, 10),
+        expectedResidualErrors: parseFloat(
+          res.headers.get('X-HITL-Expected-Residual-Errors') ?? '0'
+        ),
+      };
+    });
 }
 
 export function validateDocument(documentId) {
@@ -170,6 +216,15 @@ export function activateUser(userId) {
   return request(`/api/admin/users/${userId}/activate`, {
     method: 'POST',
   });
+}
+
+// HITL Calibration
+export function runCalibration() {
+  return request('/api/admin/calibrate', { method: 'POST' });
+}
+
+export function getCalibrationStatus() {
+  return request('/api/admin/calibrate');
 }
 
 // Document file preview

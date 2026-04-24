@@ -8,6 +8,7 @@ import {
   rejectDocument,
   getDocumentStatus,
   getDocumentFileUrl,
+  submitCorrection,
 } from '../api/client';
 import { useToast } from '../components/Toast';
 import './ReviewPage.css';
@@ -26,6 +27,8 @@ export default function ReviewPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
   const [documentBlobUrl, setDocumentBlobUrl] = useState(null);
+  const [editingField, setEditingField] = useState(null);
+  const [editValue, setEditValue] = useState('');
   const blobUrlRef = useRef(null);
 
   const isReviewerOrAdmin = user?.role === 'reviewer' || user?.role === 'admin';
@@ -110,6 +113,28 @@ export default function ReviewPage() {
     }
   };
 
+  const handleStartEdit = (field) => {
+    setEditingField(field.id);
+    setEditValue(field.fieldValue || '');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingField(null);
+    setEditValue('');
+  };
+
+  const handleSaveEdit = async (fieldId) => {
+    try {
+      await submitCorrection(docId.trim(), fieldId, editValue);
+      toast('Correction saved', 'success');
+      setEditingField(null);
+      setEditValue('');
+      await loadData(docId.trim());
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  };
+
   const handleReject = async () => {
     if (!rejectReason.trim()) {
       toast('Please provide a rejection reason', 'error');
@@ -165,48 +190,99 @@ export default function ReviewPage() {
 
       {fields.length > 0 && (
         <div className="review__split">
-          <div className="review__panel">
+          <div className="review__panel review__panel--preview">
             <div className="review__panel-title">Document Preview</div>
             <div className="review__preview">
               {documentBlobUrl ? (
                 isPdf ? (
                   <iframe
+                    className="review__preview-frame"
                     src={documentBlobUrl}
                     title="Document Preview"
-                    style={{ width: '100%', height: '600px', border: 'none' }}
                   />
                 ) : (
                   <img
+                    className="review__preview-img"
                     src={documentBlobUrl}
                     alt="Document Preview"
-                    style={{ maxWidth: '100%', height: 'auto' }}
                   />
                 )
               ) : (
-                <span>Document preview not available</span>
+                <span className="review__preview-empty">Document preview not available</span>
               )}
             </div>
           </div>
 
-          <div className="review__panel">
+          <div className="review__panel review__panel--fields">
             <div className="review__panel-title">Extracted Fields</div>
             <div className="review__fields">
-              <div className="review__field-row" style={{ fontWeight: 600, fontSize: '12px', color: 'var(--color-text-muted)' }}>
+              <div className="review__field-row review__field-row--header">
                 <span>Field</span>
                 <span>Value</span>
                 <span>Status</span>
+                {!isTerminal && <span>Actions</span>}
               </div>
-              {fields.map((f) => (
-                <div className="review__field-row" key={f.id}>
-                  <span className="review__field-label">{f.fieldName}</span>
-                  <span className={f.status === 'corrected' ? 'review__field-corrected' : 'review__field-value'}>
-                    {f.fieldValue || '\u2014'}
-                  </span>
-                  <span className={`validation__status validation__status--${f.status}`}>
-                    {f.status}
-                  </span>
-                </div>
-              ))}
+              {fields.map((f) => {
+                const editing = editingField === f.id;
+                return (
+                  <div className="review__field-row" key={f.id}>
+                    <span className="review__field-label">{f.fieldName}</span>
+                    {editing ? (
+                      <input
+                        type="text"
+                        className="review__edit-input"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveEdit(f.id);
+                          if (e.key === 'Escape') handleCancelEdit();
+                        }}
+                        autoFocus
+                      />
+                    ) : (
+                      <span
+                        className={
+                          f.status === 'corrected'
+                            ? 'review__field-corrected'
+                            : 'review__field-value'
+                        }
+                      >
+                        {f.fieldValue || '\u2014'}
+                      </span>
+                    )}
+                    <span className={`validation__status validation__status--${f.status}`}>
+                      {f.status}
+                    </span>
+                    {!isTerminal && (
+                      <span className="review__field-actions">
+                        {editing ? (
+                          <>
+                            <button
+                              className="review__field-btn review__field-btn--save"
+                              onClick={() => handleSaveEdit(f.id)}
+                            >
+                              Save
+                            </button>
+                            <button
+                              className="review__field-btn"
+                              onClick={handleCancelEdit}
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            className="review__field-btn"
+                            onClick={() => handleStartEdit(f)}
+                          >
+                            Edit
+                          </button>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

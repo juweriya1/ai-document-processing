@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
@@ -34,6 +35,10 @@ def generate_line_id():
 
 def generate_correction_id():
     return "cor_" + uuid.uuid4().hex[:6]
+
+
+def generate_batch_id():
+    return "bat_" + uuid.uuid4().hex[:8]
 
 
 def utcnow():
@@ -70,12 +75,32 @@ class Document(Base):
     approved_by = Column(String, ForeignKey("users.id"), nullable=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
     rejected_reason = Column(Text, nullable=True)
+    # Agentic pipeline fields — populated by persist_node / DocumentProcessor.
+    traceability_log = Column(JSON, nullable=True)
+    fallback_tier = Column(String(32), nullable=True)
+    confidence_score = Column(Float, nullable=True)
+    # Batch upload support — NULL for legacy single-file uploads.
+    batch_id = Column(String, ForeignKey("batches.id"), nullable=True, index=True)
 
     uploader = relationship("User", back_populates="documents", foreign_keys=[uploaded_by])
     approver = relationship("User", foreign_keys=[approved_by])
     extracted_fields = relationship("ExtractedField", back_populates="document")
     line_items = relationship("LineItem", back_populates="document")
     corrections = relationship("Correction", back_populates="document")
+    batch = relationship("Batch", back_populates="documents")
+
+
+class Batch(Base):
+    __tablename__ = "batches"
+
+    id = Column(String, primary_key=True, default=generate_batch_id)
+    created_by = Column(String, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    # uploading | processing | completed | partial_failed
+    status = Column(String, nullable=False, default="uploading")
+    total_documents = Column(Integer, nullable=False, default=0)
+
+    documents = relationship("Document", back_populates="batch")
 
 
 class ExtractedField(Base):

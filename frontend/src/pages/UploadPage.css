@@ -1,7 +1,22 @@
 .upload__title {
   font-size: 22px;
   font-weight: 700;
-  margin-bottom: 24px;
+  margin-bottom: 8px;
+}
+
+.upload__batch-link-row {
+  margin-bottom: 20px;
+}
+
+.upload__batch-link {
+  font-size: 13px;
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.upload__batch-link:hover {
+  text-decoration: underline;
 }
 
 .upload__dropzone {

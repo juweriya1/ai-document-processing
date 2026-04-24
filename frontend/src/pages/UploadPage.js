@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { uploadDocument } from '../api/client';
 import { useToast } from '../components/Toast';
 import './UploadPage.css';
@@ -64,6 +64,11 @@ export default function UploadPage() {
   return (
     <div>
       <h1 className="upload__title">Upload Document</h1>
+      <div className="upload__batch-link-row">
+        <Link to="/batch-upload" className="upload__batch-link">
+          Need to upload multiple files? Try batch upload &rarr;
+        </Link>
+      </div>
 
       <div
         className={`upload__dropzone${dragActive ? ' upload__dropzone--active' : ''}`}

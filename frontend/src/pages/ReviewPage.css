@@ -6,9 +6,10 @@
 
 .review__split {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 20px;
   margin-bottom: 24px;
+  align-items: stretch;
 }
 
 .review__panel {
@@ -16,6 +17,18 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.review__panel--preview {
+  min-height: 720px;
+}
+
+.review__panel--fields {
+  min-height: 720px;
+  overflow: hidden;
 }
 
 .review__panel-title {
@@ -24,10 +37,12 @@
   margin-bottom: 16px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
 
 .review__preview {
-  height: 320px;
+  flex: 1;
+  min-height: 0;
   background: var(--color-bg);
   border-radius: var(--radius);
   display: flex;
@@ -35,25 +50,105 @@
   justify-content: center;
   color: var(--color-text-muted);
   font-size: 14px;
+  overflow: auto;
+  padding: 8px;
+}
+
+.review__preview-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 600px;
+  border: none;
+  background: #fff;
+}
+
+.review__preview-img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.review__preview-empty {
+  color: var(--color-text-muted);
 }
 
 .review__fields {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .review__field-row {
   display: grid;
-  grid-template-columns: 120px 1fr 1fr;
+  grid-template-columns: 130px minmax(0, 1fr) 100px 130px;
   gap: 8px;
   align-items: center;
   font-size: 13px;
 }
 
+.review__field-row--header {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
 .review__field-label {
   font-weight: 600;
   color: var(--color-text-muted);
+}
+
+.review__edit-input {
+  padding: 6px 10px;
+  border: 1px solid var(--color-primary);
+  border-radius: 4px;
+  font-size: 13px;
+  width: 100%;
+  min-width: 0;
+}
+
+.review__edit-input:focus {
+  outline: none;
+  border-color: var(--color-primary-dark);
+}
+
+.review__field-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.review__field-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.review__field-btn:hover {
+  border-color: var(--color-primary);
+}
+
+.review__field-btn--save {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.review__field-btn--save:hover {
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
 }
 
 .review__field-ocr {

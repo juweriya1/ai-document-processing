@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -11,6 +13,9 @@ from src.backend.db.crud import (
     update_user,
 )
 from src.backend.db.database import get_db
+from src.backend.pipeline.confidence_calibrator import ConfidenceCalibrator
+
+CALIBRATOR_PATH = "adapters/calibrator_thresholds.json"
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -151,3 +156,36 @@ def admin_activate_user(
         role=user.role,
         is_active=user.is_active,
     )
+
+
+@router.post("/calibrate")
+def run_calibration(
+    current_user: dict = Depends(role_required(["admin"])),
+    db: Session = Depends(get_db),
+):
+    calibrator = ConfidenceCalibrator()
+    calibrator.fit(db)
+    calibrator.save(CALIBRATOR_PATH)
+    return {"trained_fields": len(calibrator._thresholds)}
+
+
+@router.get("/calibrate")
+def get_calibration_status(
+    current_user: dict = Depends(role_required(["admin"])),
+):
+    calibrator = ConfidenceCalibrator()
+    try:
+        calibrator.load(CALIBRATOR_PATH)
+    except FileNotFoundError:
+        return {
+            "fitted": False,
+            "thresholds": {},
+            "sample_counts": {},
+            "default_threshold": calibrator._default_threshold,
+        }
+    return {
+        "fitted": True,
+        "thresholds": calibrator._thresholds,
+        "sample_counts": calibrator._sample_counts,
+        "default_threshold": calibrator._default_threshold,
+    }

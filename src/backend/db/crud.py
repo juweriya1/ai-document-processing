@@ -1,10 +1,11 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from passlib.context import CryptContext
 
 from sqlalchemy import func
 
 from src.backend.db.models import (
     AnalyticsSummary,
+    Batch,
     Correction,
     Document,
     ExtractedField,
@@ -23,6 +24,7 @@ def create_document(
     file_type: str,
     file_size: int,
     uploaded_by: str | None = None,
+    batch_id: str | None = None,
 ) -> Document:
     doc = Document(
         filename=filename,
@@ -30,6 +32,7 @@ def create_document(
         file_type=file_type,
         file_size=file_size,
         uploaded_by=uploaded_by,
+        batch_id=batch_id,
     )
     db.add(doc)
     db.commit()
@@ -395,3 +398,55 @@ def get_processing_stats(db: Session) -> dict:
         .all()
     )
     return {status: count for status, count in rows}
+
+
+# --- Batch upload CRUD ------------------------------------------------------
+
+def create_batch(
+    db: Session,
+    created_by: str | None,
+    total_documents: int,
+    status: str = "processing",
+) -> Batch:
+    batch = Batch(
+        created_by=created_by,
+        total_documents=total_documents,
+        status=status,
+    )
+    db.add(batch)
+    db.commit()
+    db.refresh(batch)
+    return batch
+
+
+def get_batch(db: Session, batch_id: str) -> Batch | None:
+    return db.query(Batch).filter(Batch.id == batch_id).first()
+
+
+def get_batch_with_documents(db: Session, batch_id: str) -> Batch | None:
+    """Eager-load documents in one query to avoid N+1 on status polls."""
+    return (
+        db.query(Batch)
+        .options(joinedload(Batch.documents))
+        .filter(Batch.id == batch_id)
+        .first()
+    )
+
+
+def list_batches_for_user(
+    db: Session, user_id: str | None, limit: int = 5, include_all: bool = False
+) -> list[Batch]:
+    query = db.query(Batch)
+    if not include_all and user_id is not None:
+        query = query.filter(Batch.created_by == user_id)
+    return query.order_by(Batch.created_at.desc()).limit(limit).all()
+
+
+def update_batch_status(db: Session, batch_id: str, status: str) -> Batch | None:
+    batch = get_batch(db, batch_id)
+    if batch is None:
+        return None
+    batch.status = status
+    db.commit()
+    db.refresh(batch)
+    return batch

@@ -2,12 +2,28 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  getDocumentFields,
+  getDocumentFieldsWithStats,
   validateDocument,
   submitCorrection,
 } from '../api/client';
 import { useToast } from '../components/Toast';
 import './ValidationPage.css';
+
+const REASON_LABELS = {
+  validation_failed: 'VALIDATION FAILED',
+  missing_confidence: 'NO CONFIDENCE',
+  critical_field: 'CRITICAL',
+  low_confidence: 'LOW CONFIDENCE',
+  auto_approved: 'AUTO-APPROVED',
+};
+
+const REASON_CLASSES = {
+  validation_failed: 'validation__reason--fail',
+  missing_confidence: 'validation__reason--unknown',
+  critical_field: 'validation__reason--critical',
+  low_confidence: 'validation__reason--low',
+  auto_approved: 'validation__reason--auto',
+};
 
 export default function ValidationPage() {
   const { documentId: paramId } = useParams();
@@ -21,21 +37,25 @@ export default function ValidationPage() {
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [validationResult, setValidationResult] = useState(null);
+  const [hitlMode, setHitlMode] = useState(true);
+  const [hitlStats, setHitlStats] = useState(null);
 
   const isReviewerOrAdmin = user?.role === 'reviewer' || user?.role === 'admin';
 
   useEffect(() => {
     if (paramId) {
       setDocId(paramId);
-      loadFields(paramId);
+      loadFields(paramId, hitlMode);
     }
   }, [paramId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const loadFields = async (id) => {
+  const loadFields = async (id, useHitl) => {
     setLoading(true);
     try {
-      const data = await getDocumentFields(id);
+      const { fields: data, total, shown, skipped, expectedResidualErrors } =
+        await getDocumentFieldsWithStats(id, useHitl);
       setFields(data);
+      setHitlStats({ total, shown, skipped, expectedResidualErrors });
     } catch (err) {
       toast(err.message, 'error');
     } finally {
@@ -43,12 +63,18 @@ export default function ValidationPage() {
     }
   };
 
+  const handleToggleHitl = () => {
+    const next = !hitlMode;
+    setHitlMode(next);
+    if (docId.trim()) loadFields(docId.trim(), next);
+  };
+
   const handleLoad = () => {
     if (!docId.trim()) {
       toast('Please enter a document ID', 'error');
       return;
     }
-    loadFields(docId.trim());
+    loadFields(docId.trim(), hitlMode);
   };
 
   const handleValidate = async () => {
@@ -56,7 +82,7 @@ export default function ValidationPage() {
     try {
       const data = await validateDocument(docId.trim());
       setValidationResult(data.summary);
-      await loadFields(docId.trim());
+      await loadFields(docId.trim(), hitlMode);
       toast('Validation complete', 'success');
     } catch (err) {
       toast(err.message, 'error');
@@ -79,15 +105,61 @@ export default function ValidationPage() {
       toast('Correction submitted', 'success');
       setEditingField(null);
       setEditValue('');
-      await loadFields(docId.trim());
+      await loadFields(docId.trim(), hitlMode);
     } catch (err) {
       toast(err.message, 'error');
     }
   };
 
+  const confidenceBadgeClass = (confidence) => {
+    if (confidence == null) return 'validation__conf--unknown';
+    if (confidence >= 0.90) return 'validation__conf--high';
+    if (confidence >= 0.75) return 'validation__conf--medium';
+    return 'validation__conf--low';
+  };
+
+  const reasonLabel = (reason) => REASON_LABELS[reason] || reason || '—';
+  const reasonClass = (reason) => REASON_CLASSES[reason] || '';
+
+  const pctSaved = hitlStats && hitlStats.total > 0
+    ? Math.round((hitlStats.skipped / hitlStats.total) * 100)
+    : 0;
+
   return (
     <div>
-      <h1 className="validation__title">Data Validation</h1>
+      <div className="validation__header-row">
+        <h1 className="validation__title">Data Validation</h1>
+
+        {isReviewerOrAdmin && (
+          <div className="validation__hitl-toggle">
+            <span className="validation__hitl-label">
+              {hitlMode ? '🎯 Smart Review (HITL)' : '📋 Show All Fields'}
+            </span>
+            <button
+              className={`validation__toggle-btn ${hitlMode ? 'validation__toggle-btn--active' : ''}`}
+              onClick={handleToggleHitl}
+            >
+              {hitlMode ? 'ON' : 'OFF'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {hitlStats && hitlMode && (
+        <div className="validation__hitl-banner">
+          <div className="validation__hitl-headline">
+            Reviewing <strong>{hitlStats.shown}</strong> of <strong>{hitlStats.total}</strong> fields
+            · <strong>{hitlStats.skipped}</strong> auto-approved
+            {hitlStats.total > 0 && <> · <strong>{pctSaved}%</strong> effort saved</>}
+          </div>
+          <div className="validation__hitl-sub">
+            Sorted by risk (critical fields &amp; low confidence first).
+            Expected residual error across auto-approved fields:{' '}
+            <strong>{(hitlStats.expectedResidualErrors ?? 0).toFixed(2)}</strong>
+            {' '}(lower is safer).
+          </div>
+        </div>
+      )}
 
       {!paramId && (
         <div className="validation__input-section">
@@ -134,9 +206,11 @@ export default function ValidationPage() {
             <table className="validation__table">
               <thead>
                 <tr>
+                  <th>Priority</th>
                   <th>Field Name</th>
                   <th>Extracted Value</th>
                   <th>Confidence</th>
+                  <th>Risk</th>
                   <th>Status</th>
                   {isReviewerOrAdmin && <th>Actions</th>}
                 </tr>
@@ -147,6 +221,18 @@ export default function ValidationPage() {
                     key={field.id}
                     className={field.status === 'invalid' ? 'validation__row--invalid' : ''}
                   >
+                    <td>
+                      <span
+                        className={`validation__reason ${reasonClass(field.reviewReason)}`}
+                        title={
+                          field.effectiveThreshold != null
+                            ? `Threshold: ${(field.effectiveThreshold * 100).toFixed(1)}% · Criticality: ${field.criticality ?? 1}`
+                            : undefined
+                        }
+                      >
+                        {reasonLabel(field.reviewReason)}
+                      </span>
+                    </td>
                     <td>{field.fieldName}</td>
                     <td>
                       {editingField === field.id ? (
@@ -158,13 +244,20 @@ export default function ValidationPage() {
                           autoFocus
                         />
                       ) : (
-                        field.fieldValue || '\u2014'
+                        field.fieldValue || '—'
                       )}
                     </td>
                     <td>
-                      {field.confidence != null
-                        ? `${(field.confidence * 100).toFixed(1)}%`
-                        : '\u2014'}
+                      <span className={`validation__conf ${confidenceBadgeClass(field.confidence)}`}>
+                        {field.confidence != null
+                          ? `${(field.confidence * 100).toFixed(1)}%`
+                          : '—'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="validation__risk">
+                        {field.riskScore != null ? field.riskScore.toFixed(2) : '∞'}
+                      </span>
                     </td>
                     <td>
                       <span className={`validation__status validation__status--${field.status}`}>
@@ -223,7 +316,16 @@ export default function ValidationPage() {
         </>
       )}
 
-      {!loading && fields.length === 0 && docId && paramId && (
+      {fields.length === 0 && !loading && hitlMode && hitlStats?.skipped > 0 && (
+        <div className="validation__empty validation__empty--all-clear">
+          🎉 All {hitlStats.total} fields passed the risk budget — nothing to review.
+          {hitlStats.expectedResidualErrors > 0 && (
+            <> Expected residual error: {hitlStats.expectedResidualErrors.toFixed(2)}.</>
+          )}
+        </div>
+      )}
+
+      {!loading && fields.length === 0 && docId && paramId && !hitlStats?.skipped && (
         <div className="validation__empty">
           No extracted fields found. Process the document first.
         </div>

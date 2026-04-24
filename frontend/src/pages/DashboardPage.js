@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { healthCheck, getDashboard, getSpendByVendor } from '../api/client';
+import { Link } from 'react-router-dom';
+import { healthCheck, getDashboard, getSpendByVendor, listBatches } from '../api/client';
 import { useToast } from '../components/Toast';
 import './DashboardPage.css';
 
@@ -7,6 +8,7 @@ export default function DashboardPage() {
   const [backendStatus, setBackendStatus] = useState('checking');
   const [summary, setSummary] = useState(null);
   const [vendors, setVendors] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const toast = useToast();
 
@@ -15,10 +17,11 @@ export default function DashboardPage() {
       .then(() => setBackendStatus('healthy'))
       .catch(() => setBackendStatus('error'));
 
-    Promise.all([getDashboard(), getSpendByVendor()])
-      .then(([dashData, vendorData]) => {
+    Promise.all([getDashboard(), getSpendByVendor(), listBatches(5)])
+      .then(([dashData, vendorData, batchData]) => {
         setSummary(dashData);
         setVendors(vendorData);
+        setBatches(batchData);
       })
       .catch((err) => toast(err.message, 'error'))
       .finally(() => setLoading(false));
@@ -110,6 +113,35 @@ export default function DashboardPage() {
               ) : (
                 <div className="dashboard__chart-placeholder">
                   No vendor data yet. Upload and process documents to see spend breakdown.
+                </div>
+              )}
+            </div>
+            <div className="dashboard__chart-card">
+              <div className="dashboard__chart-title-row">
+                <div className="dashboard__chart-title">Recent Batches</div>
+                <Link to="/batch-upload" className="dashboard__chart-link">New batch &rarr;</Link>
+              </div>
+              {batches.length > 0 ? (
+                <div className="dashboard__batch-list">
+                  {batches.map((b) => (
+                    <Link
+                      key={b.id}
+                      to={`/batches/${b.id}`}
+                      className="dashboard__batch-row"
+                    >
+                      <span className="dashboard__batch-id">{b.id}</span>
+                      <span className={`dashboard__batch-status dashboard__batch-status--${b.status}`}>
+                        {b.status.replace('_', ' ')}
+                      </span>
+                      <span className="dashboard__batch-count">
+                        {b.total_documents} doc{b.total_documents === 1 ? '' : 's'}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="dashboard__chart-placeholder">
+                  No batches yet. <Link to="/batch-upload">Upload multiple files</Link> to get started.
                 </div>
               )}
             </div>

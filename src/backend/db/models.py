@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
@@ -49,6 +50,7 @@ class User(Base):
     name = Column(String, nullable=False)
     role = Column(String, nullable=False, default="enterprise_user")
     is_active = Column(Boolean, nullable=False, default=True, server_default="true")
+    insights_layout = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), default=utcnow)
 
     documents = relationship("Document", back_populates="uploader", foreign_keys="[Document.uploaded_by]")

@@ -194,3 +194,39 @@ export function getFlaggedDocuments() {
 export function getVendorRisk() {
   return request('/api/analytics/vendor-risk');
 }
+
+// BI + widget preferences + extra analytics
+export function getBIConfig() {
+  return request('/api/bi/config');
+}
+
+export function getWidgetCatalog() {
+  return request('/api/analytics/widgets/catalog');
+}
+
+export function getWidgetPreferences() {
+  return request('/api/analytics/widgets/preferences');
+}
+
+export function saveWidgetPreferences(payload) {
+  return request('/api/analytics/widgets/preferences', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getSLAMetrics() {
+  return request('/api/analytics/sla');
+}
+
+export function getThroughput() {
+  return request('/api/analytics/throughput');
+}
+
+export function getCorrectionPatterns() {
+  return request('/api/analytics/correction-patterns');
+}
+
+export function getOCRDrift() {
+  return request('/api/analytics/ocr-drift');
+}

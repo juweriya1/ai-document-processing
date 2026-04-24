@@ -10,8 +10,11 @@ import {
   getSpendByVendor, getSpendByMonth,
   getTrustOverview, getFlaggedDocuments,
   getVendorRisk, getAnomalies, getPredictions,
+  getWidgetPreferences,
 } from '../api/client';
 import { useToast } from '../components/Toast';
+import PowerBIEmbed from '../components/PowerBIEmbed';
+import WidgetPickerDrawer from '../components/WidgetPickerDrawer';
 import './InsightsPage.css';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -141,8 +144,13 @@ export default function InsightsPage() {
   const [anomalies, setAnomalies]   = useState([]);
   const [predictions, setPredictions] = useState(null);
   const [loading, setLoading]       = useState(true);
+  const [activeTab, setActiveTab]   = useState('overview');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [prefs, setPrefs]           = useState(null);
 
   const isPriv = user?.role === 'reviewer' || user?.role === 'admin';
+  const canSeeExecutiveBI = isPriv;
+  const isWidgetEnabled = (key) => !prefs || (prefs.enabled || []).includes(key);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -176,6 +184,10 @@ export default function InsightsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    getWidgetPreferences().then(setPrefs).catch(() => setPrefs(null));
+  }, []);
+
   // ── Derived chart data ─────────────────────────────────────────────────
   const vendorChartData = vendors.map((v) => ({
     name: v.vendor_name?.length > 14 ? v.vendor_name.slice(0, 14) + '…' : v.vendor_name,
@@ -206,13 +218,42 @@ export default function InsightsPage() {
   return (
     <div className="page-wrap">
       {/* ── Header ── */}
-      <div className="page-header">
-        <h1 className="page-title">Trust-Aware Procurement Intelligence</h1>
-        <p className="page-subtitle">
-          Extraction reliability, vendor risk, review prioritisation, and spend insights —
-          all derived from approved document records
-        </p>
+      <div className="insights__page-header">
+        <div>
+          <h1 className="page-title">Procurement Intelligence</h1>
+          <p className="page-subtitle">
+            Spend, compliance, and pipeline quality across your AP operations —
+            with an Executive BI dashboard for leadership reporting.
+          </p>
+        </div>
+        <button className="btn btn--secondary" onClick={() => setPickerOpen(true)}>
+          ⚙ Configure Dashboard
+        </button>
       </div>
+
+      {/* ── Tab bar ── */}
+      <div className="insights__tabs" role="tablist">
+        <button
+          role="tab"
+          className={`insights__tab${activeTab === 'overview' ? ' insights__tab--active' : ''}`}
+          onClick={() => setActiveTab('overview')}
+        >
+          Overview
+        </button>
+        {canSeeExecutiveBI && (
+          <button
+            role="tab"
+            className={`insights__tab${activeTab === 'executive' ? ' insights__tab--active' : ''}`}
+            onClick={() => setActiveTab('executive')}
+          >
+            Executive BI
+          </button>
+        )}
+      </div>
+
+      {activeTab === 'executive' && canSeeExecutiveBI ? (
+        <PowerBIEmbed />
+      ) : (<>
 
       {/* ══ SECTION 1: KPI Cards ══════════════════════════════════════════ */}
       <div className="insights__kpi-grid">
@@ -643,6 +684,13 @@ export default function InsightsPage() {
           </div>
         </div>
       </div>
+      </>)}
+
+      <WidgetPickerDrawer
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSaved={(layout) => setPrefs(layout)}
+      />
     </div>
   );
 }

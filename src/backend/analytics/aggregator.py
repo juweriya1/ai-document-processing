@@ -37,10 +37,23 @@ def get_dashboard_summary(db: Session) -> dict:
     compliance_exceptions = [d for d in all_trust if d["invalid_field_count"] > 0]
     validation_breakdown = _get_validation_breakdown(db)
 
+    if total_docs > 0:
+        compliance_score = round(
+            (total_docs - len(compliance_exceptions)) / total_docs * 100, 2
+        )
+    else:
+        compliance_score = 0.0
+
+    doc_confidence_stats = get_documents_with_confidence_stats(db)
+    confidences = [d["avg_confidence"] for d in doc_confidence_stats if d.get("avg_confidence") is not None]
+    avg_confidence = round(sum(confidences) / len(confidences), 3) if confidences else 0.0
+
     return {
         "total_documents": total_docs,
         "total_spend": round(total_spend, 2),
         "avg_trust_score": avg_trust,
+        "avg_confidence": avg_confidence,
+        "compliance_score": compliance_score,
         "high_risk_vendor_count": len(high_risk_vendors),
         "docs_requiring_review": len(needs_review),
         "escalation_count": len(escalations),

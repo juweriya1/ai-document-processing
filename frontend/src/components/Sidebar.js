@@ -80,12 +80,12 @@ const getInitials = (name) => {
 };
 
 const NAV_ITEMS = [
-  { to: '/dashboard',  label: 'Dashboard',   Icon: IconDashboard  },
-  { to: '/upload',     label: 'Upload',       Icon: IconUpload     },
-  { to: '/processing', label: 'Processing',   Icon: IconProcessing },
-  { to: '/validation', label: 'Validation',   Icon: IconValidation },
-  { to: '/review',     label: 'Review',       Icon: IconReview     },
-  { to: '/insights',   label: 'Insights',     Icon: IconInsights   },
+  { to: '/dashboard',  label: 'Overview',           Icon: IconDashboard  },
+  { to: '/upload',     label: 'Ingest Invoice',     Icon: IconUpload     },
+  { to: '/processing', label: 'Pipeline',           Icon: IconProcessing },
+  { to: '/validation', label: 'Field Verification', Icon: IconValidation },
+  { to: '/review',     label: 'Approval Queue',     Icon: IconReview     },
+  { to: '/insights',   label: 'Analytics',          Icon: IconInsights   },
 ];
 
 export default function Sidebar() {
@@ -105,8 +105,8 @@ export default function Sidebar() {
           <LogoIcon />
         </div>
         <div>
-          <div className="sidebar__brand-name">IDP</div>
-          <div className="sidebar__brand-tag">Platform</div>
+          <div className="sidebar__brand-name">AP Hub</div>
+          <div className="sidebar__brand-tag">Procurement</div>
         </div>
       </div>
 

@@ -5,6 +5,7 @@ from sqlalchemy import text
 from src.backend.api.routes_admin import router as admin_router
 from src.backend.api.routes_analytics import router as analytics_router
 from src.backend.api.routes_auth import router as auth_router
+from src.backend.api.routes_bi import router as bi_router
 from src.backend.api.routes_pipeline import router as pipeline_router
 from src.backend.api.routes_upload import router as upload_router
 from src.backend.api.routes_validation import router as validation_router
@@ -26,6 +27,9 @@ def create_tables():
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
             "is_active BOOLEAN NOT NULL DEFAULT true"
         ))
+        conn.execute(text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS insights_layout JSON"
+        ))
         conn.commit()
 
 app.add_middleware(
@@ -42,6 +46,7 @@ app.include_router(upload_router)
 app.include_router(validation_router)
 app.include_router(pipeline_router)
 app.include_router(analytics_router)
+app.include_router(bi_router)
 app.include_router(admin_router)
 
 

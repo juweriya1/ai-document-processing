@@ -386,3 +386,39 @@
 .insights__empty-icon { font-size: 32px; margin-bottom: var(--sp-3); opacity: 0.4; }
 .insights__empty-title { font-size: 14px; font-weight: 600; color: var(--text-3); margin-bottom: var(--sp-2); }
 .insights__empty-desc  { font-size: 13px; color: var(--text-5); max-width: 340px; margin: 0 auto; line-height: 1.6; }
+
+/* ── Page header with action ────────────────────────────────────────────── */
+.insights__page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
+}
+
+/* ── Tab bar ────────────────────────────────────────────────────────────── */
+.insights__tabs {
+  display: flex;
+  gap: var(--sp-1);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--sp-8);
+}
+
+.insights__tab {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-4);
+  padding: var(--sp-3) var(--sp-5);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color var(--t-fast), border-color var(--t-fast);
+  letter-spacing: -0.1px;
+}
+
+.insights__tab:hover { color: var(--text-2); }
+
+.insights__tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}

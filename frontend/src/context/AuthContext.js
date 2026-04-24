@@ -56,16 +56,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   const loginAction = useCallback(async (email, password) => {
-  const data = await apiLogin(email, password);
-
-  localStorage.setItem('idp_token', data.access_token);
-  localStorage.setItem('idp_user', JSON.stringify(data.user));
-
-  dispatch({
-    type: 'LOGIN_SUCCESS',
-    payload: { user: data.user, token: data.access_token },
-  });
-}, []);
+    const data = await apiLogin(email, password);
+    localStorage.setItem('idp_token', data.access_token);
+    localStorage.setItem('idp_user', JSON.stringify(data.user));
+    dispatch({
+      type: 'LOGIN_SUCCESS',
+      payload: { user: data.user, token: data.access_token },
+    });
+  }, []);
 
   const registerAction = useCallback(async (email, password, name, role) => {
     await apiRegister(email, password, name, role);

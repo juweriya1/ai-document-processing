@@ -178,3 +178,19 @@ export function getDocumentFileUrl(documentId) {
   const base = API_URL || '';
   return `${base}/api/documents/${documentId}/file?token=${encodeURIComponent(token || '')}`;
 }
+
+export function getTrustOverview() {
+  return request('/api/analytics/trust/overview');
+}
+
+export function getTrustForDocument(documentId) {
+  return request(`/api/analytics/trust/document/${documentId}`);
+}
+
+export function getFlaggedDocuments() {
+  return request('/api/analytics/trust/flagged');
+}
+
+export function getVendorRisk() {
+  return request('/api/analytics/vendor-risk');
+}

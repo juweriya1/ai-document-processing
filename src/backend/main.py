@@ -11,6 +11,7 @@ from src.backend.api.routes_agentic import router as agentic_router
 from src.backend.api.routes_analytics import router as analytics_router
 from src.backend.api.routes_auth import router as auth_router
 from src.backend.api.routes_batch import router as batch_router
+from src.backend.api.routes_bi import router as bi_router
 from src.backend.api.routes_pipeline import router as pipeline_router
 from src.backend.api.routes_upload import router as upload_router
 from src.backend.api.routes_validation import router as validation_router
@@ -55,6 +56,9 @@ def create_tables():
         ))
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_documents_batch_id ON documents(batch_id)"
+        ))
+        conn.execute(text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS insights_layout JSON"
         ))
         conn.commit()
 
@@ -113,6 +117,7 @@ app.include_router(validation_router)
 app.include_router(pipeline_router)
 app.include_router(agentic_router)
 app.include_router(analytics_router)
+app.include_router(bi_router)
 app.include_router(admin_router)
 
 

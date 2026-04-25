@@ -15,3 +15,8 @@ htmlcov/
 # Frontend
 frontend/node_modules/
 frontend/build/
+
+# Backup folders (IMPORTANT)
+analytics_backup/
+frontend_backup/
+frontend_backup2/

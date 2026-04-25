@@ -604,3 +604,26 @@ def get_corrected_documents_for_training(
             }
         )
     return results
+
+
+def list_all_line_items(db: Session) -> list[LineItem]:
+    return db.query(LineItem).all()
+
+
+def list_all_corrections(db: Session) -> list[Correction]:
+    return db.query(Correction).all()
+
+
+def get_user_insights_layout(db: Session, user_id: str) -> dict | None:
+    user = db.query(User).filter(User.id == user_id).first()
+    return user.insights_layout if user else None
+
+
+def set_user_insights_layout(db: Session, user_id: str, layout: dict) -> dict | None:
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return None
+    user.insights_layout = layout
+    db.commit()
+    db.refresh(user)
+    return user.insights_layout

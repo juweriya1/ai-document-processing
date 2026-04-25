@@ -37,3 +37,7 @@ langgraph>=1.1.0
 baml-py==0.221.0
 paddleocr>=3.5.0
 google-genai>=0.8.0
+# Plausibility verifier — inference loads a pickled LightGBM artifact.
+# Training-only deps (datasets, fitting, calibration) are split into
+# requirements-train.txt to keep the request-path image small.
+lightgbm>=4.3.0

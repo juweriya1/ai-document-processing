@@ -27,3 +27,7 @@ class ReasonCode(str, Enum):
     PERSIST_FAIL = "persist_fail"
     DOCUMENT_NOT_FOUND = "document_not_found"
     INVALID_STATE = "invalid_state"
+
+    # Plausibility verifier — learned gate alongside the math auditor.
+    VERIFIER_LOW_PLAUSIBILITY = "verifier_low_plausibility"
+    VERIFIER_SKIPPED = "verifier_skipped"

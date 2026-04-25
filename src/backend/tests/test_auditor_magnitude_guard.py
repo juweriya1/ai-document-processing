@@ -147,13 +147,13 @@ def test_triangulation_identifies_total_as_slipped_field():
     assert "too large" in msg
 
 
-def test_triangulation_pakistani_currency_subtotal_slip_end_to_end():
+def test_triangulation_subtotal_slip_end_to_end():
     auditor = FinancialAuditor()
-    # "Rs. 15,000/-" subtotal when it should be "Rs. 1,50,000/-" — 10x too small
+    # subtotal $150 when it should be $1,500 — 10x too small
     report = auditor.audit({
-        "subtotal": "Rs. 15,000/-",
-        "tax": "Rs. 25,500/-",
-        "total_amount": "Rs. 1,75,500/-",
+        "subtotal": "$150.00",
+        "tax": "$255.00",
+        "total_amount": "$1,755.00",
     })
     assert not report.ok
     msg = detect_magnitude_slip(report)
@@ -186,12 +186,12 @@ def test_multi_field_error_returns_none_not_a_false_slip_diagnosis():
     )
 
 
-def test_end_to_end_pakistani_10x_slip():
+def test_end_to_end_total_10x_slip():
     auditor = FinancialAuditor()
     report = auditor.audit({
-        "subtotal": "Rs. 1,50,000/-",
-        "tax": "Rs. 25,500/-",
-        "total_amount": "Rs. 17,55,000/-",  # should be 1,75,500 — 10x slip
+        "subtotal": "$1,500.00",
+        "tax": "$255.00",
+        "total_amount": "$17,550.00",  # should be 1,755 — 10x slip
     })
     assert not report.ok
     msg = detect_magnitude_slip(report)
@@ -310,11 +310,11 @@ def test_auditor_node_high_confidence_full_data_still_verifies():
 
 
 def test_auditor_node_accepts_partial_data_after_vlm_reconciliation():
-    # Real-world case: a Pakistani restaurant receipt (Madina Restaurant) has
-    # no separate tax line — GST is baked into the per-dish price. PaddleOCR
-    # already failed, Gemini reconciled and confidently returned tax=None.
-    # We must NOT loop escalating back to Gemini asking the same question;
-    # accept that "tax is genuinely absent" is a valid finding.
+    # Real-world case: a small-merchant receipt has no separate tax line —
+    # tax is baked into the per-item price. PaddleOCR already failed, Gemini
+    # reconciled and confidently returned tax=None. We must NOT loop
+    # escalating back to Gemini asking the same question; accept that
+    # "tax is genuinely absent" is a valid finding.
     state = AgentState(
         document_id="doc-vlm-partial",
         file_path="uploads/x.pdf",

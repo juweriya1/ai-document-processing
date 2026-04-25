@@ -25,11 +25,41 @@ from src.backend.pipeline.reason_codes import ReasonCode
 from src.backend.pipeline.states import DocState, db_status_for
 from src.backend.utils.currency import normalize_amount
 from src.backend.validation.auditor import FinancialAuditor, detect_magnitude_slip
+from src.backend.verifier import PlausibilityVerifier, VerifierReport
 
 logger = logging.getLogger(__name__)
 
 _GUIDANCE_LOG_CAP = 240  # chars of reconciliation_guidance to persist into the trace
 LOCAL_CONFIDENCE_THRESHOLD = 0.85  # below this, escalate to Tier-2 even if math balances
+
+
+# Lazy singleton — loaded once per process at first audit. Returns None if
+# no model artifact exists yet, and the pipeline silently runs math-only.
+# The plausibility verifier is additive: a skipped report never blocks an
+# extraction the math auditor approved.
+_VERIFIER_LOADED = False
+_VERIFIER: PlausibilityVerifier | None = None
+
+
+def _get_verifier() -> PlausibilityVerifier | None:
+    global _VERIFIER_LOADED, _VERIFIER
+    if not _VERIFIER_LOADED:
+        _VERIFIER = PlausibilityVerifier.from_latest()
+        _VERIFIER_LOADED = True
+    return _VERIFIER
+
+
+def _run_verifier(state: AgentState) -> VerifierReport:
+    """Invoke the plausibility verifier on the current extraction.
+
+    Returns a skipped report if no model is loaded — this is the cold-start
+    path and is intentionally non-blocking. The math auditor remains the
+    safety floor in either case.
+    """
+    verifier = _get_verifier()
+    if verifier is None:
+        return VerifierReport.skipped_report(reason="no_model_loaded")
+    return verifier.evaluate(state.extracted_data, state.ocr_confidence)
 
 
 def _invoice_to_fields(inv: ExtractedInvoice) -> dict[str, str | None]:
@@ -113,8 +143,8 @@ async def auditor_node(state: AgentState) -> AgentState:
                 "Local OCR extraction was unavailable for this document. "
                 "Perform a full extraction from scratch: capture invoice_number, "
                 "date, vendor_name, subtotal, tax, total_amount, and every line "
-                "item. Preserve currency markers exactly (Rs., /-, lakh-style "
-                "commas, $, etc.) and verify that subtotal + tax == total."
+                "item. Preserve currency markers exactly ($, €, £) and "
+                "thousands separators, then verify that subtotal + tax == total."
             ),
             "reason": ReasonCode.LOCAL_AUDIT_FAIL.value,
             "audit_log": [*state.audit_log, asdict(entry)],
@@ -124,25 +154,38 @@ async def auditor_node(state: AgentState) -> AgentState:
     fields = _invoice_to_fields(state.extracted_data)
     report = auditor.audit(fields)
 
+    # Run the learned plausibility verifier alongside the math auditor.
+    # Both gates must pass for an extraction to be declared verified.
+    # On cold-start (no model trained yet), verifier returns skipped=True
+    # and acts as a no-op — math-only gating is still the safety floor.
+    verifier_report = _run_verifier(state)
+
     if report.ok:
         # Quality gates beyond the raw math check:
         #   (a) `partial_data` — subtotal OR tax was None, so the equation was
         #       never actually verified. Only the total is trustworthy.
         #   (b) low OCR confidence — PaddleOCR itself is unsure; the digits may
         #       be wrong even if they happen to arithmetically balance.
+        #   (c) plausibility verifier flagged the extraction (e.g., wrong
+        #       vendor, swapped fields, line-item arithmetic violation)
         # These only escalate from Tier-1 (tier="local"). Once a Tier-2 pass
         # has produced the current extraction, we trust its result: Gemini
         # confirming "there is no tax line" is a legitimate finding, not
         # something to keep re-asking. Otherwise the graph loops on receipts
-        # whose fields are genuinely absent (common on Pakistani restaurant
-        # receipts where tax is baked into the per-dish price).
+        # whose fields are genuinely absent (common on small-merchant receipts
+        # where tax is baked into the per-item price).
         already_vlm_reconciled = state.tier == "vlm"
         partial_data = report.reason == "partial_data"
         low_confidence = (
             state.ocr_confidence is not None
             and state.ocr_confidence < LOCAL_CONFIDENCE_THRESHOLD
         )
-        if not already_vlm_reconciled and (partial_data or low_confidence):
+        verifier_failed = (
+            not verifier_report.skipped and not verifier_report.ok
+        )
+        if not already_vlm_reconciled and (
+            partial_data or low_confidence or verifier_failed
+        ):
             reasons = []
             if partial_data:
                 missing = []
@@ -163,6 +206,15 @@ async def auditor_node(state: AgentState) -> AgentState:
                     f"unsure about the digits it read, so re-extraction by a "
                     f"stronger model is warranted even though the math checks out"
                 )
+            if verifier_failed:
+                hint = _format_verifier_hint(verifier_report)
+                reasons.append(
+                    f"low_plausibility: learned verifier scored this extraction "
+                    f"{verifier_report.score:.3f} (threshold "
+                    f"{verifier_report.threshold:.3f}). The math balanced but "
+                    f"the structural / semantic features of this extraction "
+                    f"resemble historical mis-extractions. {hint}"
+                )
             guidance = (
                 "Re-extract the invoice fields from scratch. The local extractor "
                 "passed math reconciliation but failed a data-quality gate:\n\n"
@@ -170,12 +222,16 @@ async def auditor_node(state: AgentState) -> AgentState:
                 + "\n\nFocus on reading every digit of subtotal, tax, and total "
                 "accurately. Preserve currency markers exactly."
             )
+            # Reason precedence: verifier (most informative) > low_confidence > audit_fail.
+            if verifier_failed and not (partial_data or low_confidence):
+                primary_reason = ReasonCode.VERIFIER_LOW_PLAUSIBILITY
+            elif low_confidence:
+                primary_reason = ReasonCode.LOCAL_LOW_CONFIDENCE
+            else:
+                primary_reason = ReasonCode.LOCAL_AUDIT_FAIL
             entry = TraceEntry.now(
                 "audit", DocState.LOCALLY_PARSED, False,
-                reason=(
-                    ReasonCode.LOCAL_LOW_CONFIDENCE if low_confidence
-                    else ReasonCode.LOCAL_AUDIT_FAIL
-                ),
+                reason=primary_reason,
                 attempt=state.attempts,
                 subtotal=_dec_str(report.subtotal),
                 tax=_dec_str(report.tax),
@@ -184,14 +240,13 @@ async def auditor_node(state: AgentState) -> AgentState:
                 ocr_confidence=state.ocr_confidence,
                 partial_data=partial_data,
                 low_confidence=low_confidence,
+                verifier=verifier_report.to_dict(),
             )
             return state.model_copy(update={
                 "is_valid": False,
-                "reason": (
-                    ReasonCode.LOCAL_LOW_CONFIDENCE.value if low_confidence
-                    else ReasonCode.LOCAL_AUDIT_FAIL.value
-                ),
+                "reason": primary_reason.value,
                 "reconciliation_guidance": guidance,
+                "verifier_report": verifier_report.to_dict(),
                 "audit_log": [*state.audit_log, asdict(entry)],
             })
 
@@ -205,11 +260,13 @@ async def auditor_node(state: AgentState) -> AgentState:
             delta=_dec_str(report.delta),
             audit_reason=report.reason,
             ocr_confidence=state.ocr_confidence,
+            verifier=verifier_report.to_dict(),
         )
         return state.model_copy(update={
             "is_valid": True,
             "reason": ReasonCode.LOCAL_OK.value,
             "reconciliation_guidance": None,
+            "verifier_report": verifier_report.to_dict(),
             "audit_log": [*state.audit_log, asdict(entry)],
         })
 
@@ -234,7 +291,7 @@ async def auditor_node(state: AgentState) -> AgentState:
             "A total field was located on the invoice but it could not be "
             "parsed as a number — it may contain stray characters or an OCR "
             "digit misread. Re-scan the total field carefully, preserving "
-            "currency markers (Rs., /-, lakh-style commas, $, etc.) exactly "
+            "currency markers ($, €, £) and thousands separators exactly "
             "as they appear on the document."
         )
         magnitude = None
@@ -260,13 +317,32 @@ async def auditor_node(state: AgentState) -> AgentState:
         tax=_dec_str(report.tax),
         total=_dec_str(report.total),
         delta=_dec_str(report.delta),
+        verifier=verifier_report.to_dict(),
     )
     return state.model_copy(update={
         "is_valid": False,
         "reason": ReasonCode.LOCAL_AUDIT_FAIL.value,
         "reconciliation_guidance": guidance,
+        "verifier_report": verifier_report.to_dict(),
         "audit_log": [*state.audit_log, asdict(entry)],
     })
+
+
+def _format_verifier_hint(report: VerifierReport) -> str:
+    """Translate top-feature deviations into a Tier-2 guidance hint.
+
+    The verifier reports the most-deviating features at inference; this
+    helper renders them into a short natural-language sentence the
+    reconciler can pass to Gemini. Returns empty string if the verifier
+    didn't surface any explanations (e.g. baseline missing in metadata).
+    """
+    if not report.top_features:
+        return ""
+    parts = [f"{name} (deviation={round(dev, 3)})" for name, dev in report.top_features]
+    return (
+        "Top deviating features: " + ", ".join(parts) +
+        " — re-read these fields carefully and verify cross-field consistency."
+    )
 
 
 async def ocr_node(state: AgentState) -> AgentState:
@@ -487,7 +563,7 @@ async def preprocess_node(state: AgentState) -> AgentState:
 
 
 def _as_float(value: Any) -> float | None:
-    """Coerce a Gemini-returned string like "$19.00" or "Rs. 1,500/-" into a
+    """Coerce a Gemini-returned string like "$19.00" or "€1,500.00" into a
     plain float for SQLAlchemy's line_items.quantity/unit_price/total columns.
     Returns None for unparseable or missing values — line_items never blocks
     persistence on a single bad numeric cell."""

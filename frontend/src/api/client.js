@@ -99,6 +99,17 @@ export function listBatches(limit = 5) {
   return request(`/api/batches?limit=${limit}`);
 }
 
+// Documents (list / metadata)
+export function listDocuments({ skip = 0, limit = 50, batchId } = {}) {
+  const params = new URLSearchParams({ skip: String(skip), limit: String(limit) });
+  if (batchId) params.set('batchId', batchId);
+  return request(`/api/documents?${params.toString()}`);
+}
+
+export function getDocumentMetadata(documentId) {
+  return request(`/api/documents/${documentId}`);
+}
+
 // Validation
 export function getDocumentFields(documentId, hitl = false) {
   return request(`/api/documents/${documentId}/fields?hitl=${hitl}`);

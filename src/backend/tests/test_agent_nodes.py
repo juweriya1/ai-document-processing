@@ -269,15 +269,16 @@ def test_reconciler_node_runtime_error_keeps_tier_vlm_for_possible_retry(monkeyp
 
 
 def test_as_float_strips_currency_markers_gemini_returns():
-    """Regression: live Gemini returns line-item totals like "$19.00" or
-    "Rs. 1,500/-"; the persist path must coerce those into plain floats for
-    the line_items.total Float column, or the whole pipeline crashes at the
-    INSERT. This bug was caught by the live VLM smoke test."""
+    """Regression: live Gemini returns line-item totals like "$19.00" with
+    currency markers attached; the persist path must coerce those into plain
+    floats for the line_items.total Float column, or the whole pipeline
+    crashes at the INSERT. This bug was caught by the live VLM smoke test."""
     from src.backend.agents.nodes import _as_float
 
     assert _as_float("$19.00") == 19.0
-    assert _as_float("Rs. 1,50,000/-") == 150000.0
+    assert _as_float("$1,500.00") == 1500.0
     assert _as_float("€42.50") == 42.5
+    assert _as_float("£100.00") == 100.0
     assert _as_float(None) is None
     assert _as_float("") is None
     assert _as_float("not a number") is None

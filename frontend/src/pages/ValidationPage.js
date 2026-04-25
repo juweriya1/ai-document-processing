@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useDocuments } from '../context/DocumentContext';
 import {
   getDocumentFieldsWithStats,
   validateDocument,
@@ -29,9 +30,14 @@ export default function ValidationPage() {
   const { documentId: paramId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { recentDocId, recentBatch, setRecentDocId } = useDocuments();
   const toast = useToast();
 
-  const [docId, setDocId] = useState(paramId || '');
+  // Pre-fill priority: URL param > recent single-doc upload > first doc in
+  // most recent batch > empty. The user explicitly asked never to retype IDs.
+  const initialDocId = paramId || recentDocId || recentBatch?.documentIds?.[0] || '';
+
+  const [docId, setDocId] = useState(initialDocId);
   const [fields, setFields] = useState([]);
   const [loading, setLoading] = useState(false);
   const [editingField, setEditingField] = useState(null);
@@ -42,12 +48,16 @@ export default function ValidationPage() {
 
   const isReviewerOrAdmin = user?.role === 'reviewer' || user?.role === 'admin';
 
+  // Auto-load whenever the doc ID changes via URL param OR a non-batch
+  // pre-fill resolved at mount. The user shouldn't have to press "Load".
   useEffect(() => {
-    if (paramId) {
-      setDocId(paramId);
-      loadFields(paramId, hitlMode);
+    const id = paramId || initialDocId;
+    if (id) {
+      setDocId(id);
+      loadFields(id, hitlMode);
     }
-  }, [paramId]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramId]);
 
   const loadFields = async (id, useHitl) => {
     setLoading(true);
@@ -165,13 +175,33 @@ export default function ValidationPage() {
         <div className="validation__input-section">
           <label className="validation__input-label">Document ID</label>
           <div className="validation__input-row">
-            <input
-              type="text"
-              className="validation__input"
-              value={docId}
-              onChange={(e) => setDocId(e.target.value)}
-              placeholder="Enter document ID (UUID)"
-            />
+            {recentBatch?.documentIds?.length > 1 ? (
+              // Batch context: dropdown over the batch's doc IDs so the
+              // user can switch between docs without retyping.
+              <select
+                className="validation__input"
+                value={docId}
+                onChange={(e) => {
+                  setDocId(e.target.value);
+                  setRecentDocId(e.target.value);
+                }}
+              >
+                <option value="">Select a document from your last batch…</option>
+                {recentBatch.documentIds.map((id, i) => (
+                  <option key={id} value={id}>
+                    Doc {i + 1} — {id.slice(0, 12)}…
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                className="validation__input"
+                value={docId}
+                onChange={(e) => setDocId(e.target.value)}
+                placeholder="Enter document ID (UUID)"
+              />
+            )}
             <button className="validation__load-btn" onClick={handleLoad}>
               Load Fields
             </button>

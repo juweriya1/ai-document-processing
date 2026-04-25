@@ -17,7 +17,7 @@ class ExtractedInvoice(BaseModel):
 
     All numeric fields stay as strings here — the currency parser in
     `utils.currency` handles coercion to Decimal at audit time, preserving
-    region-specific markers (Rs., /-, lakh grouping) exactly as extracted.
+    currency markers ($, €, £) and thousands separators exactly as extracted.
     """
 
     invoice_number: str | None = None
@@ -48,3 +48,8 @@ class AgentState(BaseModel):
     # Set by auditor_node on failure; consumed verbatim by reconciler_node to
     # build the `error_context` argument of the BAML `ReconcileInvoice` call.
     reconciliation_guidance: str | None = None
+    # Most recent VerifierReport.to_dict() from the plausibility verifier.
+    # None = the verifier was never invoked (e.g. extraction failed before
+    # the audit gate). A skipped report is still recorded as a dict with
+    # skipped=True so traceability shows the verifier was consulted.
+    verifier_report: dict[str, Any] | None = None

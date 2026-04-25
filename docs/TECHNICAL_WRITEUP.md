@@ -64,7 +64,7 @@ The pipeline is a **LangGraph `StateGraph`** (`src/backend/agents/graph.py`) wit
 ### Tier 1 — High-Speed Local Extractor (`extraction/local_extractor.py`)
 
 - **PaddleOCR** (PP-OCRv5 mobile, CPU) produces text + bounding boxes
-- `extraction/heuristics.py` applies **regex + spatial heuristics**: label-to-value matching via bounding-box proximity, amount triangulation (subtotal + tax ≈ total), currency parsing for Rs./INR/PKR with Indian/Pakistani lakh grouping ("Rs. 1,50,000/-") and standard US grouping
+- `extraction/heuristics.py` applies **regex + spatial heuristics**: label-to-value matching via bounding-box proximity, amount triangulation (subtotal + tax ≈ total), currency parsing for `$ / € / £` with standard Western thousands-separator grouping
 - The OCR engine is cached at the class level (`_shared_engine`) to amortize initialization cost, with a thread lock (`_predict_lock`) that serializes forward passes while allowing pre/post-processing concurrency
 - Target latency: **<800ms** per document
 - Raises `LocalExtractorUnavailable` on failure → graph escalates to Tier 2

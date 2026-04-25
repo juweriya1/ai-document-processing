@@ -7,26 +7,23 @@ from typing import Iterable
 
 from src.backend.utils.currency import InvalidCurrencyError, parse as parse_amount
 
-_AMOUNT_PREFIX = r"(?:rs\.?|pkr|\$|€|£)"
-_AMOUNT_SUFFIX = r"(?:\s*/-)?"
+_AMOUNT_PREFIX = r"(?:\$|€|£)"
 
 _VALUE_ONLY_PATTERNS = [
     re.compile(
-        rf"^\s*{_AMOUNT_PREFIX}\s*([\d,]+(?:\.\d{{1,2}})?){_AMOUNT_SUFFIX}\s*$",
+        rf"^\s*{_AMOUNT_PREFIX}\s*([\d,]+(?:\.\d{{1,2}})?)\s*$",
         re.IGNORECASE,
     ),
-    re.compile(rf"^\s*([\d,]+\.\d{{1,2}}){_AMOUNT_SUFFIX}\s*$"),
-    re.compile(r"^\s*([\d,]+)\s*/-\s*$"),
+    re.compile(r"^\s*([\d,]+\.\d{1,2})\s*$"),
 ]
 
 _EMBEDDED_AMOUNT = re.compile(
-    rf"{_AMOUNT_PREFIX}\s*([\d,]+(?:\.\d{{1,2}})?){_AMOUNT_SUFFIX}"
-    rf"|([\d,]+\.\d{{1,2}}){_AMOUNT_SUFFIX}",
+    rf"{_AMOUNT_PREFIX}\s*([\d,]+(?:\.\d{{1,2}})?)"
+    rf"|([\d,]+\.\d{{1,2}})",
     re.IGNORECASE,
 )
 
-_DEC_AMT = rf"{_AMOUNT_PREFIX}?\s*([\d,]+\.\d{{1,2}}{_AMOUNT_SUFFIX})"
-_PK_AMT = rf"(?:rs\.?|pkr)\s*([\d,]+(?:\.\d{{1,2}})?{_AMOUNT_SUFFIX})"
+_DEC_AMT = rf"{_AMOUNT_PREFIX}?\s*([\d,]+\.\d{{1,2}})"
 
 _REGEX_PATTERNS = {
     "invoice_number": [
@@ -50,15 +47,12 @@ _REGEX_PATTERNS = {
         re.compile(r"(?i)(?:grand|invoice)\s+total[^\n\r]{0,60}?" + _DEC_AMT),
         re.compile(r"(?i)\btotal\s*(?:amount|due|payable)?[^\n\r]{0,60}?" + _DEC_AMT),
         re.compile(r"(?i)amount\s+(?:paid|due)[^\n\r]{0,60}?" + _DEC_AMT),
-        re.compile(r"(?i)total[^\n\r]{0,60}?" + _PK_AMT),
     ],
     "subtotal": [
         re.compile(r"(?i)sub[-\s]?total[^\n\r]{0,60}?" + _DEC_AMT),
-        re.compile(r"(?i)sub[-\s]?total[^\n\r]{0,60}?" + _PK_AMT),
     ],
     "tax": [
         re.compile(r"(?i)(?:tax|vat|gst|sales\s*tax)[^\n\r]{0,60}?" + _DEC_AMT),
-        re.compile(r"(?i)(?:tax|vat|gst|sales\s*tax)[^\n\r]{0,60}?" + _PK_AMT),
     ],
     "vendor_name": [
         re.compile(r"(?im)^\s*(?:vendor|supplier|from)[:\s]+(.+?)$"),

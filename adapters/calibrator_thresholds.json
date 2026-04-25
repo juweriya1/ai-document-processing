@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "default_threshold": 0.8,
+  "fitted_at": "2026-04-25T00:48:06.208441+00:00",
+  "thresholds": {
+    "date": 0.5,
+    "vendor_name": 0.5,
+    "total_amount": 0.5,
+    "subtotal": 0.5,
+    "invoice_number": 0.5,
+    "tax": 0.5
+  },
+  "sample_counts": {
+    "date": 51,
+    "vendor_name": 54,
+    "total_amount": 53,
+    "subtotal": 40,
+    "invoice_number": 38,
+    "tax": 38
+  }
+}

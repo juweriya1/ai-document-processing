@@ -1,9 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useDocuments } from '../context/DocumentContext';
 import './Navbar.css';
 
 const links = [
   { to: '/dashboard', label: 'Dashboard' },
+  { to: '/documents', label: 'Documents' },
   { to: '/upload', label: 'Upload' },
   { to: '/processing', label: 'Processing' },
   { to: '/validation', label: 'Validation' },
@@ -13,11 +15,15 @@ const links = [
 
 export default function Navbar() {
   const { isAuthenticated, user, logout } = useAuth();
+  const { clearAll: clearDocumentsCache } = useDocuments();
   const navigate = useNavigate();
 
   if (!isAuthenticated) return null;
 
   const handleLogout = () => {
+    // Clear cached doc IDs / processing results so the next user doesn't
+    // inherit them. Critical because localStorage is shared per-origin.
+    clearDocumentsCache();
     logout();
     navigate('/login');
   };

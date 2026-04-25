@@ -1,0 +1,4 @@
+# Training-only dependencies for the plausibility verifier.
+# Install on the machine that runs `python scripts/train_verifier.py`.
+# These are NOT needed in the request-path container.
+-r requirements.txt

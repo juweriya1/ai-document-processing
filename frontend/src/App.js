@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { DocumentProvider } from './context/DocumentContext';
 import { ToastProvider } from './components/Toast';
 import Navbar from './components/Navbar';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -11,6 +12,7 @@ import BatchStatusPage from './pages/BatchStatusPage';
 import ProcessingPage from './pages/ProcessingPage';
 import ValidationPage from './pages/ValidationPage';
 import ReviewPage from './pages/ReviewPage';
+import DocumentsListPage from './pages/DocumentsListPage';
 import InsightsPage from './pages/InsightsPage';
 import AdminPage from './pages/AdminPage';
 import './App.css';
@@ -102,6 +104,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/documents"
+          element={
+            <ProtectedRoute>
+              <div className="app__content"><DocumentsListPage /></div>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/insights"
           element={
             <ProtectedRoute>
@@ -127,11 +137,13 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <ToastProvider>
-          <div className="app">
-            <AppRoutes />
-          </div>
-        </ToastProvider>
+        <DocumentProvider>
+          <ToastProvider>
+            <div className="app">
+              <AppRoutes />
+            </div>
+          </ToastProvider>
+        </DocumentProvider>
       </AuthProvider>
     </BrowserRouter>
   );

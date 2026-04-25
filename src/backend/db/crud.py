@@ -48,6 +48,37 @@ def list_documents(db: Session, skip: int = 0, limit: int = 100) -> list[Documen
     return db.query(Document).offset(skip).limit(limit).all()
 
 
+def list_documents_for_user(
+    db: Session,
+    user_id: str | None,
+    *,
+    include_all: bool = False,
+    skip: int = 0,
+    limit: int = 50,
+    batch_id: str | None = None,
+) -> tuple[list[Document], int]:
+    """List documents visible to a user, newest first.
+
+    `include_all=True` is for admins/reviewers — they see every document.
+    Otherwise the query is restricted to documents the user uploaded.
+    Returns (rows, total_count) so the UI can paginate without a second
+    round trip.
+    """
+    query = db.query(Document)
+    if not include_all and user_id is not None:
+        query = query.filter(Document.uploaded_by == user_id)
+    if batch_id is not None:
+        query = query.filter(Document.batch_id == batch_id)
+    total = query.count()
+    rows = (
+        query.order_by(Document.uploaded_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return rows, total
+
+
 def store_extracted_fields(
     db: Session, document_id: str, fields: list[dict]
 ) -> list[ExtractedField]:
@@ -450,3 +481,126 @@ def update_batch_status(db: Session, batch_id: str, status: str) -> Batch | None
     db.commit()
     db.refresh(batch)
     return batch
+
+
+def get_verified_extractions_for_training(
+    db: Session, limit: int = 500
+) -> list[Document]:
+    """Pull clean extractions to train the plausibility verifier on.
+
+    A document is "clean" iff:
+      - it reached terminal status `verified`
+      - it has at least one extracted field
+      - it has zero submitted corrections (humans never disputed it)
+
+    The verifier needs positives that genuinely reflect plausible
+    extractions. Including approved-with-corrections would teach the
+    model that mis-extracted invoices are plausible (the corrections
+    are what made them right). Sorted by most recent first so retraining
+    favors recent OCR/Gemini behavior.
+    """
+    corrected_doc_ids = (
+        db.query(Correction.document_id).distinct().subquery()
+    )
+    return (
+        db.query(Document)
+        .filter(Document.status == "verified")
+        .filter(~Document.id.in_(db.query(corrected_doc_ids.c.document_id)))
+        .filter(
+            Document.id.in_(
+                db.query(ExtractedField.document_id).distinct()
+            )
+        )
+        .order_by(Document.processed_at.desc().nullslast())
+        .limit(limit)
+        .all()
+    )
+
+
+def get_corrected_documents_for_training(
+    db: Session, limit: int = 500
+) -> list[dict]:
+    """Pull human-corrected extractions for semi-supervised verifier training.
+
+    For each document with at least one correction, return BOTH:
+      - `before_field_map`: the extraction as the model produced it
+        (i.e. the value before any human edit). For each corrected field,
+        we substitute the most-recent `corrections.original_value` —
+        which the correction handler stored verbatim at edit time.
+      - `after_field_map`: the current `extracted_fields.field_value`
+        (i.e. what the human said it should have been).
+
+    These become labeled training pairs: `before` is a confirmed
+    NEGATIVE (the model got it wrong), `after` is a confirmed POSITIVE
+    (the human said this is correct). Unlike synthetic corruption,
+    these are real failure modes drawn from actual production traffic.
+
+    Returned dict shape:
+      {
+        "document_id": str,
+        "before": {field_name: field_value | None, ...},
+        "after":  {field_name: field_value | None, ...},
+        "line_items": [{quantity, unit_price, total, description}, ...],
+      }
+    Line items aren't covered by the corrections table today, so they
+    pass through identically in both before/after — meaning the only
+    delta the verifier learns from is what humans actually edited.
+    """
+    corrected_doc_ids = (
+        db.query(Correction.document_id)
+        .distinct()
+        .order_by(Correction.document_id)
+        .limit(limit)
+        .all()
+    )
+    results: list[dict] = []
+    for (doc_id,) in corrected_doc_ids:
+        fields = (
+            db.query(ExtractedField)
+            .filter(ExtractedField.document_id == doc_id)
+            .all()
+        )
+        if not fields:
+            continue
+        # current_field_map = the corrected extraction (post-human edit)
+        after_map: dict[str, str | None] = {f.field_name: f.field_value for f in fields}
+
+        # Reconstruct the pre-correction extraction. For each field that
+        # has corrections, take the EARLIEST correction's original_value —
+        # that's what the model actually produced before any human touched
+        # it. (Subsequent re-edits build off the human's prior value, not
+        # the model's.)
+        before_map: dict[str, str | None] = dict(after_map)
+        for f in fields:
+            earliest = (
+                db.query(Correction)
+                .filter(Correction.field_id == f.id)
+                .order_by(Correction.created_at.asc())
+                .first()
+            )
+            if earliest is not None:
+                before_map[f.field_name] = earliest.original_value
+
+        line_rows = (
+            db.query(LineItem)
+            .filter(LineItem.document_id == doc_id)
+            .all()
+        )
+        line_items = [
+            {
+                "description": li.description,
+                "quantity": str(li.quantity) if li.quantity is not None else None,
+                "unit_price": str(li.unit_price) if li.unit_price is not None else None,
+                "total": str(li.total) if li.total is not None else None,
+            }
+            for li in line_rows
+        ]
+        results.append(
+            {
+                "document_id": doc_id,
+                "before": before_map,
+                "after": after_map,
+                "line_items": line_items,
+            }
+        )
+    return results

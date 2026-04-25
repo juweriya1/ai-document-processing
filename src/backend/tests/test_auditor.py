@@ -24,15 +24,26 @@ def test_math_fails_outside_tolerance():
     assert report.delta == Decimal("-5.00")
 
 
-def test_pakistani_currency_math_pass():
+def test_us_currency_math_pass():
     auditor = FinancialAuditor()
     report = auditor.audit({
-        "subtotal": "Rs. 1,50,000/-",
-        "tax": "Rs. 25,500/-",
-        "total_amount": "Rs. 1,75,500/-",
+        "subtotal": "$1,500.00",
+        "tax": "$255.00",
+        "total_amount": "$1,755.00",
     })
     assert report.ok
-    assert report.total == Decimal("175500")
+    assert report.total == Decimal("1755.00")
+
+
+def test_euro_currency_math_pass():
+    auditor = FinancialAuditor()
+    report = auditor.audit({
+        "subtotal": "€100.00",
+        "tax": "€19.00",
+        "total_amount": "€119.00",
+    })
+    assert report.ok
+    assert report.total == Decimal("119.00")
 
 
 def test_partial_data_returns_ok_with_reason():

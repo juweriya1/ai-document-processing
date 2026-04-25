@@ -1,52 +1,66 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useDocuments } from '../context/DocumentContext';
 import {
   getDocumentFields,
   getDocumentCorrections,
   approveDocument,
   rejectDocument,
   getDocumentStatus,
-  getDocumentFileUrl,
   submitCorrection,
 } from '../api/client';
 import { useToast } from '../components/Toast';
+import DocumentViewer from '../components/DocumentViewer';
 import './ReviewPage.css';
+
+// Pull the most recent verifier verdict out of the traceability_log so it
+// can be surfaced in the trace pane. The auditor_node writes a "verifier"
+// detail block on every audit pass; we want the latest one (the
+// post-Tier-2 verdict, when there was a Tier 2).
+function pickLatestVerifierVerdict(traceabilityLog) {
+  if (!Array.isArray(traceabilityLog)) return null;
+  for (let i = traceabilityLog.length - 1; i >= 0; i -= 1) {
+    const entry = traceabilityLog[i];
+    if (entry?.stage === 'audit' && entry?.detail?.verifier) {
+      return entry.detail.verifier;
+    }
+  }
+  return null;
+}
 
 export default function ReviewPage() {
   const { documentId: paramId } = useParams();
   const navigate = useNavigate(); // eslint-disable-line no-unused-vars
   const { user } = useAuth();
+  const { recentDocId, recentBatch, setRecentDocId } = useDocuments();
   const toast = useToast();
 
-  const [docId, setDocId] = useState(paramId || '');
+  // Pre-fill priority: URL param > recent single-doc upload > first doc
+  // in last batch. Avoids the user re-typing the doc ID they just uploaded.
+  const initialDocId = paramId || recentDocId || recentBatch?.documentIds?.[0] || '';
+
+  const [docId, setDocId] = useState(initialDocId);
   const [fields, setFields] = useState([]);
   const [corrections, setCorrections] = useState([]);
   const [docStatus, setDocStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectInput, setShowRejectInput] = useState(false);
-  const [documentBlobUrl, setDocumentBlobUrl] = useState(null);
   const [editingField, setEditingField] = useState(null);
   const [editValue, setEditValue] = useState('');
-  const blobUrlRef = useRef(null);
 
   const isReviewerOrAdmin = user?.role === 'reviewer' || user?.role === 'admin';
 
+  // Auto-load on URL param OR when a non-empty doc ID is pre-filled at mount.
   useEffect(() => {
-    if (paramId) {
-      setDocId(paramId);
-      loadData(paramId);
+    const id = paramId || initialDocId;
+    if (id) {
+      setDocId(id);
+      loadData(id);
     }
-  }, [paramId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    return () => {
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-      }
-    };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paramId]);
 
   const loadData = async (id) => {
     setLoading(true);
@@ -57,8 +71,6 @@ export default function ReviewPage() {
       ]);
       setFields(fieldsData);
       setDocStatus(statusData);
-
-      loadDocumentPreview(id);
 
       if (isReviewerOrAdmin) {
         try {
@@ -72,26 +84,6 @@ export default function ReviewPage() {
       toast(err.message, 'error');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadDocumentPreview = async (id) => {
-    try {
-      const fileUrl = getDocumentFileUrl(id);
-      const token = localStorage.getItem('idp_token');
-      const response = await fetch(fileUrl, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      });
-      if (!response.ok) return;
-      const blob = await response.blob();
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-      }
-      const blobUrl = URL.createObjectURL(blob);
-      blobUrlRef.current = blobUrl;
-      setDocumentBlobUrl(blobUrl);
-    } catch {
-      // Preview not available
     }
   };
 
@@ -153,7 +145,9 @@ export default function ReviewPage() {
 
   const isTerminal = docStatus?.status === 'approved' || docStatus?.status === 'rejected';
 
-  const isPdf = docStatus?.filename?.toLowerCase().endsWith('.pdf');
+  // Verifier verdict from the latest auditor pass — if a Tier 2 ran, this
+  // reflects the post-reconciliation plausibility, not the pre-Tier-2 one.
+  const verifierVerdict = pickLatestVerifierVerdict(docStatus?.traceability_log);
 
   return (
     <div>
@@ -163,13 +157,31 @@ export default function ReviewPage() {
         <div className="review__input-section">
           <label className="review__input-label">Document ID</label>
           <div className="review__input-row">
-            <input
-              type="text"
-              className="review__input"
-              value={docId}
-              onChange={(e) => setDocId(e.target.value)}
-              placeholder="Enter document ID (UUID)"
-            />
+            {recentBatch?.documentIds?.length > 1 ? (
+              <select
+                className="review__input"
+                value={docId}
+                onChange={(e) => {
+                  setDocId(e.target.value);
+                  setRecentDocId(e.target.value);
+                }}
+              >
+                <option value="">Select a document from your last batch…</option>
+                {recentBatch.documentIds.map((id, i) => (
+                  <option key={id} value={id}>
+                    Doc {i + 1} — {id.slice(0, 12)}…
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                className="review__input"
+                value={docId}
+                onChange={(e) => setDocId(e.target.value)}
+                placeholder="Enter document ID (UUID)"
+              />
+            )}
             <button className="review__load-btn" onClick={handleLoad}>
               Load Review
             </button>
@@ -193,24 +205,41 @@ export default function ReviewPage() {
           <div className="review__panel review__panel--preview">
             <div className="review__panel-title">Document Preview</div>
             <div className="review__preview">
-              {documentBlobUrl ? (
-                isPdf ? (
-                  <iframe
-                    className="review__preview-frame"
-                    src={documentBlobUrl}
-                    title="Document Preview"
-                  />
-                ) : (
-                  <img
-                    className="review__preview-img"
-                    src={documentBlobUrl}
-                    alt="Document Preview"
-                  />
-                )
-              ) : (
-                <span className="review__preview-empty">Document preview not available</span>
-              )}
+              <DocumentViewer documentId={docId.trim()} filename={docStatus?.filename} />
             </div>
+            {verifierVerdict && !verifierVerdict.skipped && (
+              <div
+                className={
+                  verifierVerdict.ok
+                    ? 'review__verifier review__verifier--ok'
+                    : 'review__verifier review__verifier--flag'
+                }
+              >
+                <div className="review__verifier-row">
+                  <strong>Plausibility verifier:</strong>{' '}
+                  {verifierVerdict.ok ? 'PASSED' : 'FLAGGED'}
+                  {' '}— score{' '}
+                  <strong>{(verifierVerdict.score ?? 0).toFixed(3)}</strong>
+                  {' '}/ threshold {(verifierVerdict.threshold ?? 0).toFixed(3)}
+                </div>
+                {Array.isArray(verifierVerdict.top_features) &&
+                  verifierVerdict.top_features.length > 0 && (
+                    <div className="review__verifier-row">
+                      <span className="review__verifier-sub">
+                        Top deviating features:
+                      </span>{' '}
+                      {verifierVerdict.top_features
+                        .map((f) => `${f.name} (${(f.contribution ?? 0).toFixed(3)})`)
+                        .join(' · ')}
+                    </div>
+                  )}
+              </div>
+            )}
+            {verifierVerdict && verifierVerdict.skipped && (
+              <div className="review__verifier review__verifier--skipped">
+                Plausibility verifier: skipped ({verifierVerdict.reason || 'no model loaded'})
+              </div>
+            )}
           </div>
 
           <div className="review__panel review__panel--fields">

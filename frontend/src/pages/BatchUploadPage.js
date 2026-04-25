@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { uploadBatch } from '../api/client';
+import { useDocuments } from '../context/DocumentContext';
 import { useToast } from '../components/Toast';
 import './BatchUploadPage.css';
 
@@ -25,6 +26,7 @@ export default function BatchUploadPage() {
   const inputRef = useRef(null);
   const toast = useToast();
   const navigate = useNavigate();
+  const { setRecentBatch } = useDocuments();
 
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
   const tooManyFiles = files.length > MAX_FILES;
@@ -84,6 +86,12 @@ export default function BatchUploadPage() {
     setUploading(true);
     try {
       const data = await uploadBatch(files);
+      // Cache batch ID + per-doc IDs so the Validation/Review pages can
+      // present a doc selector instead of a free-text doc-ID input.
+      setRecentBatch(
+        data.batch_id,
+        (data.documents || []).map((d) => d.id || d.documentId).filter(Boolean),
+      );
       toast(`Batch of ${data.total_documents} document(s) submitted`, 'success');
       navigate(`/batches/${data.batch_id}`);
     } catch (err) {

@@ -7,11 +7,6 @@ import './BatchStatusPage.css';
 const TERMINAL_BATCH = new Set(['completed', 'partial_failed']);
 const RUNNING_DOC = new Set(['uploaded', 'processing']);
 
-// Assume ~6s/doc on Tier-1 (paddle OCR + audit) serially; the semaphore runs
-// up to 3 in parallel. This is shown to the jury as a demoable metric.
-const SEQUENTIAL_SEC_PER_DOC = 6;
-const CONCURRENCY = 3;
-
 function StatusBadge({ status }) {
   const cls = `batch-status__badge batch-status__badge--${status || 'unknown'}`;
   return <span className={cls}>{(status || 'unknown').replace('_', ' ')}</span>;
@@ -108,8 +103,6 @@ export default function BatchStatusPage() {
   const elapsedSec = startedAtRef.current
     ? Math.max(0, (now - startedAtRef.current) / 1000)
     : 0;
-  const sequentialEstimate = total_documents * SEQUENTIAL_SEC_PER_DOC;
-  const speedup = elapsedSec > 0 ? sequentialEstimate / elapsedSec : 0;
   const isTerminal = TERMINAL_BATCH.has(status);
   const hasFailed = (counts.failed || 0) > 0;
 
@@ -201,16 +194,6 @@ export default function BatchStatusPage() {
         ))}
       </div>
 
-      {isTerminal && (
-        <div className="batch-status__summary">
-          Processed <strong>{total_documents}</strong> document(s) in{' '}
-          <strong>{formatElapsed(elapsedSec)}</strong>. Sequential baseline{' '}
-          &asymp; {formatElapsed(sequentialEstimate)} &middot; Concurrency: {CONCURRENCY}
-          {speedup > 1 && elapsedSec > 0 && (
-            <> &middot; <strong>{speedup.toFixed(1)}&times;</strong> speedup</>
-          )}
-        </div>
-      )}
     </div>
   );
 }

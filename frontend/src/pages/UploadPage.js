@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { uploadDocument } from '../api/client';
+import { useDocuments } from '../context/DocumentContext';
 import { useToast } from '../components/Toast';
 import './UploadPage.css';
 
@@ -18,6 +19,7 @@ export default function UploadPage() {
   const inputRef = useRef(null);
   const toast = useToast();
   const navigate = useNavigate();
+  const { setRecentDocId } = useDocuments();
 
   const handleDrag = (e) => {
     e.preventDefault();
@@ -53,6 +55,9 @@ export default function UploadPage() {
       const data = await uploadDocument(file);
       setResult(data);
       setFile(null);
+      // Cache the new doc ID so downstream pages (Processing, Validation,
+      // Review) can pre-fill their inputs without copy-paste.
+      setRecentDocId(data.id);
       toast('Document uploaded successfully', 'success');
     } catch (err) {
       toast(err.message, 'error');

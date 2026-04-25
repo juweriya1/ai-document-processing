@@ -89,7 +89,7 @@ Persistence: PostgreSQL
 
 ## 4. Walk-through of a real request
 
-Copy-pasted from an actual `curl` test, trimmed. Receipt: Madina Restaurant, Pakistani thermal-printed bill. PaddleOCR confidence was low, so the pipeline escalated to Gemini.
+Copy-pasted from an actual `curl` test, trimmed. Receipt: small-merchant thermal-printed bill. PaddleOCR confidence was low, so the pipeline escalated to Gemini.
 
 ```
 1. ✓ preprocess  —  1 page, 2272×1539 → deskewed, denoised
@@ -122,7 +122,7 @@ For each major decision: the options actually evaluated, the one selected, the r
 
 **Selected:** `decimal.Decimal` throughout (`src/backend/utils/currency.py`, `validation/auditor.py`).
 
-**Why:** Binary `float` rounds `0.1 + 0.2 = 0.30000000000000004`, so two invoices identical to the human eye can compare unequal. For Pakistani lakh grouping (`"Rs. 1,50,000/-"`) and Western grouping (`"$1,500,000.00"`), we need exact decimal arithmetic. `Fraction` is exact but doesn't round nicely for display and is slower for large volumes.
+**Why:** Binary `float` rounds `0.1 + 0.2 = 0.30000000000000004`, so two invoices identical to the human eye can compare unequal. For Western currency formats (`"$1,500,000.00"`, `"€1,234.56"`), we need exact decimal arithmetic. `Fraction` is exact but doesn't round nicely for display and is slower for large volumes.
 
 **Rejected:**
 - `float` — disqualified in 15 minutes of audit: a test case with `"100.10" + "0.20" == "100.30"` failed in `float` arithmetic.
@@ -259,7 +259,7 @@ Covered by 11 pure-function tests in `src/backend/tests/test_auditor_magnitude_g
 - `ocr_confidence < 0.85` on Tier-1 → escalate (OCR is self-reportedly unsure; even if math happens to balance, digits may be wrong).
 - `report.ok` AND any of the above on **Tier-2** → **do not re-escalate** (Gemini has already been asked; a confident "tax is None" is a legitimate finding, not a retry opportunity).
 
-**Why the asymmetry:** The failure modes that justify *escalation* ("OCR is noisy, re-ask a stronger model") do not justify *re-asking the stronger model repeatedly*. This pattern showed up as a live bug in development — the pipeline was looping 3× at ~17s each on a Pakistani restaurant receipt whose "tax" field was genuinely absent. Fix verified by 2 regression tests in `test_auditor_magnitude_guard.py`.
+**Why the asymmetry:** The failure modes that justify *escalation* ("OCR is noisy, re-ask a stronger model") do not justify *re-asking the stronger model repeatedly*. This pattern showed up as a live bug in development — the pipeline was looping 3× at ~17s each on a receipt whose "tax" field was genuinely absent. Fix verified by 2 regression tests in `test_auditor_magnitude_guard.py`.
 
 ---
 
@@ -286,12 +286,12 @@ Legacy code preserved as `# `-prefixed comments with clear DEPRECATED banners. E
 
 | Suite | File | Count | What it covers |
 |---|---|---|---|
-| FinancialAuditor unit tests | `test_auditor.py` | 7 | Math pass, within-tolerance, math fail, Pakistani currency, partial data, unreadable total, missing total |
-| Magnitude Guard + auditor_node | `test_auditor_magnitude_guard.py` | 27 | Triangulation for each field, Pakistani slip detection, multi-field-error rejection, low-confidence escalation, partial-data escalation, post-VLM acceptance |
+| FinancialAuditor unit tests | `test_auditor.py` | 7 | Math pass, within-tolerance, math fail, Western currency formats, partial data, unreadable total, missing total |
+| Magnitude Guard + auditor_node | `test_auditor_magnitude_guard.py` | 27 | Triangulation for each field, decimal-slip detection, multi-field-error rejection, low-confidence escalation, partial-data escalation, post-VLM acceptance |
 | ocr_node + reconciler_node | `test_agent_nodes.py` | 11 | Happy path, LocalExtractor unavailable, runtime errors, empty extraction, malformed line items, reconciler guidance passthrough, HITL routing, currency-coercion regression |
 | LangGraph BDD | `test_agent_graph.py` | 5 | Successful local (no reconcile), VLM fallback corrects slip, HITL exhaustion at `attempts=3`, VLM unavailable → immediate HITL, preprocess failure short-circuits |
 | Agentic FastAPI route | `tests/unit/test_routes_agentic.py` | 14 | JWT enforcement, 401/403/404, response shape matching `ProcessingPage.handleProcess`, DocState→frontend-status translation, status endpoint |
-| Currency parser | `test_currency.py` | 15 | Pakistani lakh grouping, Western grouping, prefixes/suffixes, garbage rejection |
+| Currency parser | `test_currency.py` | 14 | Western thousands-separator grouping, $/€/£/USD prefixes & suffixes, lakh-grouping rejection, garbage rejection |
 | States / DocState transitions | `test_states.py` | 3 | Enum mapping, valid transitions, invalid transitions raise |
 | Legacy DocumentProcessor | `test_document_processor.py` | 7 | Retained as regression safety; the retired orchestrator still passes its own tests |
 
@@ -378,11 +378,11 @@ A formal CORD / SROIE benchmark would be the publication-grade number. That's on
 
 **Point at:** `src/backend/tests/`, `docs/durs_paper.md` §5.
 
-### Q6. "You mentioned Pakistani currency — how does that actually help?"
+### Q6. "How does the currency parser handle real-world OCR strings?"
 
-**A.** `Rs. 1,50,000/-` is parsed as `Decimal(150000)` by `utils.currency.parse`. The Western-style alternative (`1,500,000.00`) is also parsed correctly. The grouping resolver asserts "last group must be 3 digits, earlier groups must be 2 or 3 digits" to handle `1,50,000` (lakh) vs `150,000` (thousands). Without this, a Pakistani invoice's `Rs. 1,50,000` would be read as `150` (comma-as-decimal) or `1500000` (all commas stripped, wrong magnitude). 15 unit tests in `test_currency.py` lock this down.
+**A.** `$1,500,000.00`, `€1,234.56`, `£500`, `2500.50 USD`, and bare numerics all parse to `Decimal` exactly. The grouping resolver enforces standard Western thousands-separator grouping (every comma-separated group after the head must be 3 digits) and rejects malformed grouping like `1,500,00`. The whole parser runs in microseconds and never touches `float`. 14 unit tests in `test_currency.py` lock this down.
 
-**Point at:** `src/backend/utils/currency.py::_resolve_grouping`, `test_currency.py::TestParse::test_indian_lakh`.
+**Point at:** `src/backend/utils/currency.py::_resolve_grouping`, `test_currency.py::TestParse`.
 
 ### Q7. "The Magnitude Guard — is this novel?"
 
@@ -446,7 +446,7 @@ Timing budget:
 | 0:00-1:00 | Title + problem statement | Enterprise STP gap, 3 limitations of existing IDP+GPT products |
 | 1:00-2:30 | Architecture diagram (§3) | Walk the 5 nodes, name the 3 conditional routers, emphasize "two-tier with selective escalation" |
 | 2:30-4:00 | **Live demo #1 — happy path** | Upload clean invoice → PaddleOCR verifies → `status=verified`, `tier=local`, trace shows 3 entries |
-| 4:00-6:00 | **Live demo #2 — VLM fallback** | Upload difficult receipt (Pakistani, low contrast) → PaddleOCR fails the data-quality gate → Gemini reconciles → `status=review_pending`, `tier=vlm`, trace shows the auditor guidance and the reconciliation |
+| 4:00-6:00 | **Live demo #2 — VLM fallback** | Upload difficult receipt (low-contrast or skewed) → PaddleOCR fails the data-quality gate → Gemini reconciles → `status=review_pending`, `tier=vlm`, trace shows the auditor guidance and the reconciliation |
 | 6:00-7:30 | **Novel contributions** | Magnitude Guard triangulation (show `auditor.py::_triangulate_slipped_field`), Decimal math, BAML fallback chain |
 | 7:30-8:30 | **Verification** | 92 tests, live smoke scripts, traceability_log screenshot from DB |
 | 8:30-9:30 | **Honest positioning** | "LLM-augmented state machine, not autonomous agent" (§5.7), why that's the right choice for financial STP |
@@ -482,7 +482,7 @@ src/backend/
 │   ├── states.py              DocState enum + transitions
 │   └── reason_codes.py        ReasonCode enum (persisted in traceability_log)
 ├── utils/
-│   └── currency.py      Pakistani + Western currency parser
+│   └── currency.py      Western currency parser ($, €, £, USD, EUR, GBP)
 ├── db/
 │   ├── models.py        SQLAlchemy: Document, ExtractedField, LineItem, Correction
 │   └── crud.py          Sync CRUD; wrapped in asyncio.to_thread by agentic layer

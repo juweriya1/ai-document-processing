@@ -164,9 +164,9 @@ class NeuralFallback:
             "Re-extract the invoice as strict JSON with keys: invoice_number, "
             "date (YYYY-MM-DD), vendor_name, subtotal, tax, total_amount. Pay "
             "EXTRA attention to the field(s) named in the diagnostic above. "
-            "Watch for decimal-point placement, currency markers (Rs., /-, "
-            "lakh grouping, $), and OCR digit confusions (0↔O, 1↔l, 8↔B). "
-            "Preserve currency markers exactly. Your output must satisfy "
+            "Watch for decimal-point placement, currency markers ($, €, £), "
+            "and OCR digit confusions (0↔O, 1↔l, 8↔B). Preserve currency "
+            "markers exactly. Your output must satisfy "
             "subtotal + tax == total_amount. Respond with JSON only."
         )
         try:
@@ -189,8 +189,8 @@ class NeuralFallback:
         prompt = (
             "Extract the following fields from this invoice as strict JSON: "
             "invoice_number, date (YYYY-MM-DD), vendor_name, subtotal, tax, total_amount. "
-            "Preserve currency markers (Rs., /-, commas). Use null for missing fields. "
-            "Respond with JSON only, no prose."
+            "Preserve currency markers ($, €, £) and thousands separators. "
+            "Use null for missing fields. Respond with JSON only, no prose."
         )
         try:
             resp = client.models.generate_content(

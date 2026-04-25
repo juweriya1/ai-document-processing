@@ -3,8 +3,8 @@ from __future__ import annotations
 import re
 from decimal import Decimal, InvalidOperation
 
-_PREFIX = re.compile(r"^(rs\.?|pkr|inr|usd|\$|€|£)\s*", re.IGNORECASE)
-_SUFFIX = re.compile(r"(/-|\s*rs\.?|\s*pkr)$", re.IGNORECASE)
+_PREFIX = re.compile(r"^(usd|eur|gbp|\$|€|£)\s*", re.IGNORECASE)
+_SUFFIX = re.compile(r"(\s*usd|\s*eur|\s*gbp)$", re.IGNORECASE)
 _WHITESPACE = re.compile(r"\s+")
 _NUMERIC = re.compile(r"^-?\d+(\.\d+)?$")
 
@@ -26,6 +26,9 @@ def _strip_currency_markers(s: str) -> str:
 
 
 def _resolve_grouping(raw: str) -> str:
+    """Validate Western thousands-separator grouping (groups of 3 digits)
+    and return the digits-only form. Raises on malformed grouping like
+    `1,50,000` (Indian lakh-style — not supported)."""
     if "," not in raw:
         return raw
 
@@ -44,11 +47,9 @@ def _resolve_grouping(raw: str) -> str:
     if not head or not all(g.isdigit() for g in tail) or not head.lstrip("-").isdigit():
         raise InvalidCurrencyError(f"Unparseable currency grouping: {raw!r}")
 
-    if tail[-1] and len(tail[-1]) != 3:
-        raise InvalidCurrencyError(f"Last group must be 3 digits: {raw!r}")
-
-    for g in tail[:-1]:
-        if len(g) not in (2, 3):
+    # Western convention: every group after the head is exactly 3 digits.
+    for g in tail:
+        if len(g) != 3:
             raise InvalidCurrencyError(f"Invalid group length: {raw!r}")
 
     clean_int = head + "".join(tail)
@@ -58,8 +59,8 @@ def _resolve_grouping(raw: str) -> str:
 def parse(value: str | int | float | Decimal | None) -> Decimal:
     """Parse a currency string to Decimal.
 
-    Handles Pakistani/Indian lakh grouping ("Rs. 1,50,000/-"), US grouping
-    ("$1,500,000.00"), and bare numerics. Raises InvalidCurrencyError on bad input.
+    Handles Western formats: `$1,500,000.00`, `€1,234.56`, `1234.56 USD`,
+    bare numerics. Raises InvalidCurrencyError on bad input.
     """
     if value is None:
         raise InvalidCurrencyError("Cannot parse None as currency")

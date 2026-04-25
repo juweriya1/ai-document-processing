@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { processDocument, getDocumentStatus } from '../api/client';
+import { useDocuments } from '../context/DocumentContext';
 import { useToast } from '../components/Toast';
 import './ProcessingPage.css';
 
@@ -25,16 +26,42 @@ export default function ProcessingPage() {
   const { documentId: paramId } = useParams();
   const navigate = useNavigate();
   const toast = useToast();
+  const { lastProcessing, recentDocId, setProcessingResult, clearProcessingResult } = useDocuments();
 
-  const [docId, setDocId] = useState(paramId || '');
+  // Initial doc-ID resolution priority:
+  //   URL param > most-recent processing result > most-recent uploaded ID > empty
+  // This is the "no copy-paste" UX the user asked for.
+  const initialDocId = paramId || lastProcessing?.documentId || recentDocId || '';
+
+  const [docId, setDocId] = useState(initialDocId);
   const [processing, setProcessing] = useState(false);
-  const [docStatus, setDocStatus] = useState(null);
+  // Restore last processing result so navigating away and back doesn't blank the page.
+  // Only restore when it matches the current docId (otherwise it's stale).
+  const [docStatus, setDocStatus] = useState(() => {
+    if (lastProcessing && (paramId === lastProcessing.documentId || (!paramId && initialDocId === lastProcessing.documentId))) {
+      return lastProcessing.result;
+    }
+    return null;
+  });
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (paramId) {
       setDocId(paramId);
+      // If the URL param matches the cached result, surface it; otherwise
+      // fetch fresh status so we don't show stale data for a different doc.
+      if (lastProcessing && lastProcessing.documentId === paramId) {
+        setDocStatus(lastProcessing.result);
+      } else {
+        getDocumentStatus(paramId)
+          .then((result) => {
+            setDocStatus(result);
+            setProcessingResult(paramId, result);
+          })
+          .catch(() => { /* user can press the button manually */ });
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paramId]);
 
   const handleProcess = async () => {
@@ -46,12 +73,14 @@ export default function ProcessingPage() {
     setError(null);
     try {
       const result = await processDocument(docId.trim());
-      setDocStatus({
+      const next = {
         document_id: result.document_id,
         status: result.status,
         fields_extracted: result.fields_extracted,
         line_items_extracted: result.line_items_extracted,
-      });
+      };
+      setDocStatus(next);
+      setProcessingResult(docId.trim(), next);
       toast(`Processing complete: ${result.fields_extracted} fields extracted`, 'success');
     } catch (err) {
       setError(err.message);
@@ -69,11 +98,19 @@ export default function ProcessingPage() {
     try {
       const result = await getDocumentStatus(docId.trim());
       setDocStatus(result);
+      setProcessingResult(docId.trim(), result);
       setError(null);
     } catch (err) {
       setError(err.message);
       toast(err.message, 'error');
     }
+  };
+
+  const handleReset = () => {
+    clearProcessingResult();
+    setDocStatus(null);
+    setDocId('');
+    setError(null);
   };
 
   const currentStatus = docStatus?.status || '';
@@ -105,6 +142,15 @@ export default function ProcessingPage() {
           >
             Check Status
           </button>
+          {(docStatus || docId) && (
+            <button
+              className="processing__action-btn processing__action-btn--secondary"
+              onClick={handleReset}
+              title="Clear cached result and start fresh"
+            >
+              Reset
+            </button>
+          )}
         </div>
       </div>
 

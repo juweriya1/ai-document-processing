@@ -46,14 +46,14 @@ class TestWidgetsCatalog:
         resp = client.get("/api/analytics/widgets/catalog", headers=_auth(user))
         assert resp.status_code == 200
         keys = {w["key"] for w in resp.json()}
-        assert "iframe_powerbi" not in keys  # reviewer/admin only
+        assert "table_flagged" not in keys  # reviewer/admin only
 
     def test_admin_gets_all_widgets(self, client, test_db):
         admin = create_user(test_db, email="a@test.com", password="x", name="A", role="admin")
         resp = client.get("/api/analytics/widgets/catalog", headers=_auth(admin))
         assert resp.status_code == 200
         keys = {w["key"] for w in resp.json()}
-        assert "iframe_powerbi" in keys
+        assert "table_flagged" in keys
 
 
 class TestWidgetsPreferences:
@@ -90,8 +90,8 @@ class TestWidgetsPreferences:
     def test_put_strips_widgets_not_allowed_for_role(self, client, test_db):
         user = create_user(test_db, email="u3@test.com", password="x", name="U", role="enterprise_user")
         payload = {
-            "enabled": ["iframe_powerbi", "kpi_total_spend"],
-            "order":   ["iframe_powerbi", "kpi_total_spend"],
+            "enabled": ["table_flagged", "kpi_total_spend"],
+            "order":   ["table_flagged", "kpi_total_spend"],
         }
         resp = client.put(
             "/api/analytics/widgets/preferences",
@@ -100,5 +100,5 @@ class TestWidgetsPreferences:
         )
         assert resp.status_code == 200
         saved = resp.json()
-        assert "iframe_powerbi" not in saved["enabled"]
+        assert "table_flagged" not in saved["enabled"]
         assert "kpi_total_spend" in saved["enabled"]

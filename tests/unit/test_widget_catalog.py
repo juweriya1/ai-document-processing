@@ -9,13 +9,13 @@ from src.backend.analytics.widget_catalog import (
 class TestCatalogForRole:
     def test_enterprise_user_does_not_see_reviewer_only_widgets(self):
         keys = {w["key"] for w in catalog_for_role("enterprise_user")}
-        assert "iframe_powerbi" not in keys
+        assert "ai_insights" not in keys
         assert "grid_vendor_risk" not in keys
         assert "table_flagged" not in keys
 
     def test_reviewer_sees_reviewer_widgets(self):
         keys = {w["key"] for w in catalog_for_role("reviewer")}
-        assert "iframe_powerbi" in keys
+        assert "table_flagged" in keys
         assert "grid_vendor_risk" in keys
 
     def test_unknown_role_returns_empty(self):
@@ -34,14 +34,14 @@ class TestValidateLayout:
         assert "kpi_total_spend" in layout["enabled"]
 
     def test_strips_widgets_not_allowed_for_role(self):
-        # iframe_powerbi is reviewer/admin only
+        # table_flagged is reviewer/admin only
         layout = validate_layout(
-            enabled=["iframe_powerbi", "kpi_total_spend"],
-            order=["iframe_powerbi", "kpi_total_spend"],
+            enabled=["table_flagged", "kpi_total_spend"],
+            order=["table_flagged", "kpi_total_spend"],
             role="enterprise_user",
         )
-        assert "iframe_powerbi" not in layout["enabled"]
-        assert "iframe_powerbi" not in layout["order"]
+        assert "table_flagged" not in layout["enabled"]
+        assert "table_flagged" not in layout["order"]
         assert "kpi_total_spend" in layout["enabled"]
 
     def test_enabled_keys_are_appended_to_order_when_missing(self):

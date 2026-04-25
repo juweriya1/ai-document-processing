@@ -1,5 +1,166 @@
 /* ═══ Trust-Aware Procurement Intelligence — Insights Page ═══ */
 
+/* ── Scoped design tokens. The pre-redesign global CSS does not define these,
+      so we scope a dark dashboard token set to .page-wrap (only InsightsPage
+      uses that class). Children — including the modal drawer — inherit. ── */
+.page-wrap {
+  --bg-1: #060c1a;
+  --bg-2: #0a1220;
+  --bg-3: #0f1a2e;
+  --bg-4: #14213d;
+  --bg-5: #1a2848;
+  --border-subtle: rgba(56, 189, 248, 0.06);
+  --border:        rgba(56, 189, 248, 0.12);
+  --border-strong: rgba(56, 189, 248, 0.28);
+  --accent:        #38bdf8;
+  --accent-bright: #7dd3fc;
+  --accent-dim:    rgba(56, 189, 248, 0.12);
+  --accent-glow:   rgba(56, 189, 248, 0.25);
+  --purple:        #a78bfa;
+  --purple-dim:    rgba(167, 139, 250, 0.12);
+  --success:       #34d399;
+  --success-dim:   rgba(52, 211, 153, 0.12);
+  --warning:       #fbbf24;
+  --warning-dim:   rgba(251, 191, 36, 0.12);
+  --error:         #f87171;
+  --error-dim:     rgba(248, 113, 113, 0.12);
+  --text-1: #f8fafc;
+  --text-2: #e2e8f0;
+  --text-3: #94a3b8;
+  --text-4: #64748b;
+  --text-5: #334155;
+  --font-display: 'Syne', system-ui, sans-serif;
+  --font-mono:    'Space Mono', ui-monospace, monospace;
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-12: 48px;
+  --radius-sm: 6px; --radius: 10px; --radius-lg: 16px;
+  --shadow:    0 4px 16px rgba(0,0,0,0.5), 0 2px 6px rgba(0,0,0,0.4);
+  --shadow-lg: 0 10px 40px rgba(0,0,0,0.6), 0 4px 16px rgba(0,0,0,0.5);
+  --t-fast: 150ms ease;
+  --t-base: 250ms ease;
+
+  background: var(--bg-1);
+  color: var(--text-2);
+  padding: var(--sp-8);
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: calc(100vh - 64px);
+  border-radius: var(--radius-lg);
+}
+
+.page-wrap .page-title {
+  font-family: var(--font-display);
+  font-size: 28px; font-weight: 700;
+  color: var(--text-1);
+  letter-spacing: -0.5px;
+}
+.page-wrap .page-subtitle {
+  font-size: 14px; color: var(--text-3); margin-top: var(--sp-2);
+}
+
+/* Header layout for the title + Configure button */
+.insights__page-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: var(--sp-4); margin-bottom: var(--sp-8);
+}
+
+/* Tabs */
+.insights__tabs {
+  display: flex; gap: var(--sp-2);
+  margin-bottom: var(--sp-6);
+  border-bottom: 1px solid var(--border);
+}
+.insights__tab {
+  padding: var(--sp-3) var(--sp-4);
+  background: transparent;
+  color: var(--text-4);
+  font-size: 13px; font-weight: 600;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.insights__tab:hover { color: var(--text-2); }
+.insights__tab--active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Buttons */
+.page-wrap .btn,
+.wpd .btn {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: 9px 20px; border-radius: var(--radius);
+  font-size: 14px; font-weight: 500;
+  border: none; cursor: pointer;
+  transition: all var(--t-base);
+  white-space: nowrap;
+}
+.page-wrap .btn:disabled, .wpd .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.page-wrap .btn--primary, .wpd .btn--primary {
+  background: var(--accent); color: #001830; font-weight: 600;
+}
+.page-wrap .btn--primary:hover:not(:disabled),
+.wpd .btn--primary:hover:not(:disabled) { background: var(--accent-bright); }
+.page-wrap .btn--secondary, .wpd .btn--secondary {
+  background: var(--bg-5); color: var(--text-2); border: 1px solid var(--border);
+}
+.page-wrap .btn--secondary:hover:not(:disabled),
+.wpd .btn--secondary:hover:not(:disabled) {
+  background: var(--bg-4); border-color: var(--border-strong); color: var(--text-1);
+}
+.page-wrap .btn--ghost, .wpd .btn--ghost {
+  background: transparent; color: var(--text-3); border: 1px solid var(--border);
+}
+.page-wrap .btn--ghost:hover:not(:disabled),
+.wpd .btn--ghost:hover:not(:disabled) {
+  background: var(--bg-4); color: var(--text-1); border-color: var(--border-strong);
+}
+
+/* Badges */
+.page-wrap .badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border-radius: 100px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.page-wrap .badge--success { background: var(--success-dim); color: var(--success); }
+.page-wrap .badge--warning { background: var(--warning-dim); color: var(--warning); }
+.page-wrap .badge--error   { background: var(--error-dim);   color: var(--error); }
+.page-wrap .badge--purple  { background: var(--purple-dim);  color: var(--purple); }
+
+/* Empty state + skeleton + spinner */
+.page-wrap .empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: var(--sp-8); text-align: center; color: var(--text-3);
+}
+.page-wrap .empty-state__icon  { font-size: 32px; opacity: 0.5; margin-bottom: var(--sp-2); }
+.page-wrap .empty-state__title { font-size: 14px; font-weight: 600; color: var(--text-2); margin-bottom: var(--sp-1); }
+.page-wrap .empty-state__desc  { font-size: 12px; color: var(--text-4); max-width: 320px; }
+
+.page-wrap .skeleton, .wpd .skeleton {
+  background: linear-gradient(90deg, var(--bg-3) 25%, var(--bg-4) 50%, var(--bg-3) 75%);
+  background-size: 200% auto;
+  animation: shimmer 1.5s linear infinite;
+  border-radius: var(--radius);
+}
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+.page-wrap .spinner, .wpd .spinner {
+  width: 20px; height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up { animation: slideUp var(--t-base) both; }
+
 /* ── KPI Cards ───────────────────────────────────────────────────────────── */
 .insights__kpi-grid {
   display: grid;

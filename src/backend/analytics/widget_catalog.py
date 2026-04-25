@@ -7,32 +7,32 @@ server-side guardrail: it strips any keys the user shouldn't be able to pick.
 """
 
 APPROVED_WIDGETS = [
-    # Executive KPIs
-    {"key": "kpi_total_spend",       "title": "Total Spend",                  "category": "Finance",    "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
-    {"key": "kpi_docs_processed",    "title": "Documents Processed",          "category": "Operations", "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
-    {"key": "kpi_avg_trust",         "title": "Avg Trust Score",              "category": "Quality",    "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
-    {"key": "kpi_auto_approve_rate", "title": "Auto-Approve Rate",            "category": "Operations", "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
-    {"key": "kpi_exceptions",        "title": "Compliance Exceptions",        "category": "Compliance", "default": True,  "roles": ["reviewer", "admin"]},
-    {"key": "kpi_high_risk_vendors", "title": "High-Risk Vendors",            "category": "Compliance", "default": True,  "roles": ["reviewer", "admin"]},
+    # KPI cards (top of page)
+    {"key": "kpi_total_spend",       "title": "Total Spend",                  "category": "Finance",     "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
+    {"key": "kpi_docs_processed",    "title": "Documents Processed",          "category": "Operations",  "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
+    {"key": "kpi_avg_trust",         "title": "Avg Trust Score",              "category": "Quality",     "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
+    {"key": "kpi_high_risk_vendors", "title": "High-Risk Vendors",            "category": "Compliance",  "default": True,  "roles": ["reviewer", "admin"]},
+    {"key": "kpi_requiring_review",  "title": "Requiring Review",             "category": "Operations",  "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
+    {"key": "kpi_exceptions",        "title": "Compliance Exceptions",        "category": "Compliance",  "default": True,  "roles": ["reviewer", "admin"]},
+    {"key": "kpi_anomaly_count",     "title": "Anomalies Detected",           "category": "Quality",     "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
 
-    # Charts
-    {"key": "chart_spend_vendor",    "title": "Spend by Vendor",              "category": "Finance",    "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
-    {"key": "chart_spend_trend",     "title": "Monthly Spend Trend",          "category": "Finance",    "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
-    {"key": "chart_spend_forecast",  "title": "Spend Forecast",               "category": "Finance",    "default": False, "roles": ["reviewer", "admin"]},
-    {"key": "chart_trust_dist",      "title": "Trust Score Distribution",     "category": "Quality",    "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
-    {"key": "chart_priority_mix",    "title": "Review Priority Mix",          "category": "Quality",    "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
-    {"key": "chart_validation_fail", "title": "Validation Failure Breakdown", "category": "Quality",    "default": True,  "roles": ["reviewer", "admin"]},
-    {"key": "chart_correction_top",  "title": "Top Corrected Fields",         "category": "Quality",    "default": False, "roles": ["reviewer", "admin"]},
-    {"key": "chart_ocr_drift",       "title": "OCR Confidence Drift",         "category": "Quality",    "default": False, "roles": ["reviewer", "admin"]},
-    {"key": "chart_sla",             "title": "Processing SLA",               "category": "Operations", "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
-    {"key": "chart_throughput",      "title": "Daily Throughput",             "category": "Operations", "default": False, "roles": ["enterprise_user", "reviewer", "admin"]},
+    # Quality / trust charts
+    {"key": "chart_trust_dist",      "title": "Trust Score Distribution",     "category": "Quality",     "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
+    {"key": "chart_priority_mix",    "title": "Review Priority Breakdown",    "category": "Quality",     "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
+    {"key": "chart_validation_fail", "title": "Validation Failure Breakdown", "category": "Quality",     "default": True,  "roles": ["reviewer", "admin"]},
+    {"key": "chart_anomaly_list",    "title": "Anomaly Detection",            "category": "Quality",     "default": True,  "roles": ["reviewer", "admin"]},
 
-    # Tables and special
-    {"key": "table_flagged",         "title": "Flagged Documents",            "category": "Compliance", "default": True,  "roles": ["reviewer", "admin"]},
-    {"key": "grid_vendor_risk",      "title": "Vendor Risk Heatmap",          "category": "Compliance", "default": True,  "roles": ["reviewer", "admin"]},
-    {"key": "grid_anomalies",        "title": "Statistical Exceptions",       "category": "Compliance", "default": False, "roles": ["reviewer", "admin"]},
-    {"key": "iframe_powerbi",        "title": "Executive BI Dashboard",       "category": "Executive",  "default": True,  "roles": ["reviewer", "admin"]},
-    {"key": "explainer_formula",     "title": "How Scoring Works",            "category": "Executive",  "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
+    # Spend
+    {"key": "chart_spend_vendor",    "title": "Spend by Vendor",              "category": "Finance",     "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
+    {"key": "chart_spend_trend",     "title": "Monthly Spend Trend",          "category": "Finance",     "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
+
+    # Compliance
+    {"key": "table_flagged",         "title": "Flagged Documents Table",      "category": "Compliance",  "default": True,  "roles": ["reviewer", "admin"]},
+    {"key": "grid_vendor_risk",      "title": "Vendor Risk Ranking",          "category": "Compliance",  "default": True,  "roles": ["reviewer", "admin"]},
+
+    # Reference
+    {"key": "ai_insights",           "title": "AI-Generated Insights",        "category": "Executive",   "default": True,  "roles": ["reviewer", "admin"]},
+    {"key": "explainer_formula",     "title": "How Scoring Works",            "category": "Executive",   "default": True,  "roles": ["enterprise_user", "reviewer", "admin"]},
 ]
 
 

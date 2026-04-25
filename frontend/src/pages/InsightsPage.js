@@ -214,6 +214,8 @@ export default function InsightsPage() {
 
   const validationData = dashboard?.validation_failure_breakdown || [];
 
+  const totalSpend = vendors.reduce((sum, v) => sum + (v.total_spend || 0), 0);
+
   // ── Render ─────────────────────────────────────────────────────────────
   return (
     <div className="page-wrap">
@@ -260,51 +262,72 @@ export default function InsightsPage() {
         {loading ? (
           [1,2,3,4,5,6].map((i) => <SkeletonCard key={i} h={130} />)
         ) : (<>
-          <KpiCard
-            icon="📄" iconClass="blue"
-            label="Documents Processed"
-            value={dashboard?.total_documents ?? 0}
-            sub={`${dashboard?.documents_by_status?.approved ?? 0} approved`}
-          />
-          <KpiCard
-            icon="🛡" iconClass="green"
-            label="Avg Trust Score"
-            value={trustData?.avg_trust_score != null ? `${trustData.avg_trust_score}/100` : '–'}
-            sub="Based on OCR confidence, corrections & validation"
-            colorClass={
-              trustData?.avg_trust_score >= 75 ? 'trust'
-              : trustData?.avg_trust_score >= 50 ? ''
-              : 'warn'
-            }
-          />
-          <KpiCard
-            icon="⚠️" iconClass="orange"
-            label="High-Risk Vendors"
-            value={dashboard?.high_risk_vendor_count ?? 0}
-            sub="Risk score ≥ 60 — correction + invalid field patterns"
-            colorClass={dashboard?.high_risk_vendor_count > 0 ? 'warn' : ''}
-          />
-          <KpiCard
-            icon="🔍" iconClass="yellow"
-            label="Requiring Review"
-            value={dashboard?.docs_requiring_review ?? 0}
-            sub={`${dashboard?.escalation_count ?? 0} escalations, ${dashboard?.reject_count ?? 0} rejections`}
-            colorClass={dashboard?.docs_requiring_review > 0 ? 'warn' : ''}
-          />
-          <KpiCard
-            icon="❌" iconClass="red"
-            label="Compliance Exceptions"
-            value={dashboard?.compliance_exception_count ?? 0}
-            sub="Documents with invalid extracted fields"
-            colorClass={dashboard?.compliance_exception_count > 0 ? 'danger' : ''}
-          />
-          <KpiCard
-            icon="🚨" iconClass="purple"
-            label="Anomalies Detected"
-            value={dashboard?.anomaly_count ?? 0}
-            sub="Statistical outliers in amount, confidence, corrections"
-            colorClass={dashboard?.anomaly_count > 0 ? 'danger' : ''}
-          />
+          {isWidgetEnabled('kpi_total_spend') && (
+            <KpiCard
+              icon="💰" iconClass="green"
+              label="Total Spend"
+              value={fmtMoney(totalSpend)}
+              sub={`Across ${vendors.length} vendor${vendors.length === 1 ? '' : 's'}`}
+              colorClass="trust"
+            />
+          )}
+          {isWidgetEnabled('kpi_docs_processed') && (
+            <KpiCard
+              icon="📄" iconClass="blue"
+              label="Documents Processed"
+              value={dashboard?.total_documents ?? 0}
+              sub={`${dashboard?.documents_by_status?.approved ?? 0} approved`}
+            />
+          )}
+          {isWidgetEnabled('kpi_avg_trust') && (
+            <KpiCard
+              icon="🛡" iconClass="green"
+              label="Avg Trust Score"
+              value={trustData?.avg_trust_score != null ? `${trustData.avg_trust_score}/100` : '–'}
+              sub="Based on OCR confidence, corrections & validation"
+              colorClass={
+                trustData?.avg_trust_score >= 75 ? 'trust'
+                : trustData?.avg_trust_score >= 50 ? ''
+                : 'warn'
+              }
+            />
+          )}
+          {isWidgetEnabled('kpi_high_risk_vendors') && (
+            <KpiCard
+              icon="⚠️" iconClass="orange"
+              label="High-Risk Vendors"
+              value={dashboard?.high_risk_vendor_count ?? 0}
+              sub="Risk score ≥ 60 — correction + invalid field patterns"
+              colorClass={dashboard?.high_risk_vendor_count > 0 ? 'warn' : ''}
+            />
+          )}
+          {isWidgetEnabled('kpi_requiring_review') && (
+            <KpiCard
+              icon="🔍" iconClass="yellow"
+              label="Requiring Review"
+              value={dashboard?.docs_requiring_review ?? 0}
+              sub={`${dashboard?.escalation_count ?? 0} escalations, ${dashboard?.reject_count ?? 0} rejections`}
+              colorClass={dashboard?.docs_requiring_review > 0 ? 'warn' : ''}
+            />
+          )}
+          {isWidgetEnabled('kpi_exceptions') && (
+            <KpiCard
+              icon="❌" iconClass="red"
+              label="Compliance Exceptions"
+              value={dashboard?.compliance_exception_count ?? 0}
+              sub="Documents with invalid extracted fields"
+              colorClass={dashboard?.compliance_exception_count > 0 ? 'danger' : ''}
+            />
+          )}
+          {isWidgetEnabled('kpi_anomaly_count') && (
+            <KpiCard
+              icon="🚨" iconClass="purple"
+              label="Anomalies Detected"
+              value={dashboard?.anomaly_count ?? 0}
+              sub="Statistical outliers in amount, confidence, corrections"
+              colorClass={dashboard?.anomaly_count > 0 ? 'danger' : ''}
+            />
+          )}
         </>)}
       </div>
 
@@ -321,7 +344,7 @@ export default function InsightsPage() {
       </div>
 
       <div className="insights__charts-grid" style={{ marginBottom: 'var(--sp-8)' }}>
-        {/* Trust distribution */}
+        {isWidgetEnabled('chart_trust_dist') && (
         <div className="insights__chart-card">
           <div className="insights__chart-header">
             <span className="insights__chart-title">Trust Score Distribution</span>
@@ -339,8 +362,9 @@ export default function InsightsPage() {
             <EmptyState icon="📊" title="No trust data yet" desc="Process documents to generate trust scores" />
           )}
         </div>
+        )}
 
-        {/* Review priority breakdown */}
+        {isWidgetEnabled('chart_priority_mix') && (
         <div className="insights__chart-card">
           <div className="insights__chart-header">
             <span className="insights__chart-title">Review Priority Breakdown</span>
@@ -356,8 +380,9 @@ export default function InsightsPage() {
             <EmptyState icon="🏷" title="No priority data" desc="Documents will be classified as they are processed" />
           )}
         </div>
+        )}
 
-        {/* Validation failure breakdown */}
+        {isWidgetEnabled('chart_validation_fail') && (
         <div className="insights__chart-card">
           <div className="insights__chart-header">
             <span className="insights__chart-title">Validation Failure Breakdown</span>
@@ -381,8 +406,9 @@ export default function InsightsPage() {
             <EmptyState icon="✅" title="No validation failures" desc="All extracted fields passed validation" />
           )}
         </div>
+        )}
 
-        {/* Anomalies */}
+        {isWidgetEnabled('chart_anomaly_list') && (
         <div className="insights__chart-card">
           <div className="insights__chart-header">
             <span className="insights__chart-title">Anomaly Detection</span>
@@ -405,9 +431,11 @@ export default function InsightsPage() {
             <EmptyState icon="🟢" title="No anomalies detected" desc="All documents are within normal statistical parameters" />
           )}
         </div>
+        )}
       </div>
 
       {/* ══ SECTION 3: Flagged Documents Table ═══════════════════════════ */}
+      {isWidgetEnabled('table_flagged') && (<>
       <div className="insights__section-header">
         <div className="insights__section-title">
           <span className="badge badge--error">FLAGGED</span>
@@ -481,8 +509,10 @@ export default function InsightsPage() {
           <EmptyState icon="✅" title="No flagged documents" desc="All processed documents are Auto-Approve candidates" />
         </div>
       )}
+      </>)}
 
       {/* ══ SECTION 4: Spend Analysis ═════════════════════════════════════ */}
+      {(isWidgetEnabled('chart_spend_vendor') || isWidgetEnabled('chart_spend_trend')) && (<>
       <div className="insights__section-header">
         <div className="insights__section-title">
           <span className="badge badge--purple">SPEND</span>
@@ -494,7 +524,7 @@ export default function InsightsPage() {
       </div>
 
       <div className="insights__charts-grid">
-        {/* Vendor spend */}
+        {isWidgetEnabled('chart_spend_vendor') && (
         <div className="insights__chart-card">
           <div className="insights__chart-header">
             <span className="insights__chart-title">Spend by Vendor</span>
@@ -518,8 +548,9 @@ export default function InsightsPage() {
             <EmptyState icon="💰" title="No spend data" desc="Approve documents with vendor names and amounts to see spend breakdown" />
           )}
         </div>
+        )}
 
-        {/* Monthly trend */}
+        {isWidgetEnabled('chart_spend_trend') && (
         <div className="insights__chart-card">
           <div className="insights__chart-header">
             <span className="insights__chart-title">Monthly Spend Trend</span>
@@ -562,10 +593,12 @@ export default function InsightsPage() {
             <EmptyState icon="📈" title="No monthly data" desc="More approved records are needed to generate spend trends" />
           )}
         </div>
+        )}
       </div>
+      </>)}
 
       {/* ══ SECTION 5: Vendor Risk Ranking ═══════════════════════════════ */}
-      {isPriv && (
+      {isPriv && isWidgetEnabled('grid_vendor_risk') && (
         <>
           <div className="insights__section-header">
             <div className="insights__section-title">
@@ -623,7 +656,7 @@ export default function InsightsPage() {
       )}
 
       {/* ══ SECTION 6: AI-Generated Insights ════════════════════════════ */}
-      {isPriv && predictions?.insights?.length > 0 && (
+      {isPriv && isWidgetEnabled('ai_insights') && predictions?.insights?.length > 0 && (
         <>
           <div className="insights__section-header">
             <div className="insights__section-title">
@@ -649,6 +682,7 @@ export default function InsightsPage() {
       )}
 
       {/* ══ SECTION 7: Formula Explainer ═════════════════════════════════ */}
+      {isWidgetEnabled('explainer_formula') && (
       <div className="insights__explainer">
         <div className="insights__explainer-title">
           <svg width="14" height="14" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5"/><path d="M10 9v5M10 7v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
@@ -684,6 +718,7 @@ export default function InsightsPage() {
           </div>
         </div>
       </div>
+      )}
       </>)}
 
       <WidgetPickerDrawer
